@@ -54,14 +54,29 @@ class Exporter(context: Context, private val library: Library) {
     private val app = context.applicationContext
     private val resolver: ContentResolver = app.contentResolver
 
-    suspend fun toDownloads(item: LibraryItem, folder: String?, extension: String = extensionOf(item)): ExportResult = io {
+    /** The bytes to export: the verified library file, or a temporary M4A encoded from it. */
+    private class Payload(val file: File, val mime: String, val extension: String, val temporary: Boolean)
+    private suspend fun payload(item: LibraryItem, format: String?): Payload {
         val source = sourceOf(item)
+        if (format != "m4a" || item.mime != "audio/wav") return Payload(source, item.mime ?: "application/octet-stream", extensionOf(item), false)
+        val work = File(library.temp.apply { mkdirs() }, java.util.UUID.randomUUID().toString())
+        val pcm = File(work.path + ".pcm"); val m4a = File(work.path + ".m4a")
+        try {
+            val decoded = com.voicestudio.mobile.local.AndroidAudioDecoder().decode(source, pcm, 14400) {}
+            com.voicestudio.mobile.local.AndroidDubMedia().encodeAac(decoded, m4a) {}
+        } catch (e: Exception) { m4a.delete(); throw mapFailure(e) } finally { pcm.delete() }
+        return Payload(m4a, "audio/mp4", "m4a", true)
+    }
+    private inline fun <T> using(payload: Payload, block: (Payload) -> T): T = try { block(payload) } finally { if (payload.temporary) payload.file.delete() }
+
+    suspend fun toDownloads(item: LibraryItem, folder: String?, format: String? = null): ExportResult = io { using(payload(item, format)) { p ->
+        val source = p.file
         requireSpace(publicFreeBytes(), source.length())
         val relative = Environment.DIRECTORY_DOWNLOADS + "/VoiceStudio" + (folder?.let { "/" + safeFolder(it) } ?: "")
-        val name = uniqueName(safeFileName(item.title, extension)) { candidate -> downloadsContain(relative, candidate) }
+        val name = uniqueName(safeFileName(item.title, p.extension)) { candidate -> downloadsContain(relative, candidate) }
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, item.mime ?: "application/octet-stream")
+            put(MediaStore.MediaColumns.MIME_TYPE, p.mime)
             put(MediaStore.MediaColumns.RELATIVE_PATH, relative)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
@@ -79,15 +94,16 @@ class Exporter(context: Context, private val library: Library) {
             runCatching { resolver.delete(uri, null, null) }
             throw mapFailure(e)
         }
-    }
+    } }
 
     /** [tree] comes from ACTION_OPEN_DOCUMENT_TREE with a persisted grant. */
-    suspend fun toFolder(item: LibraryItem, tree: Uri, extension: String = extensionOf(item)): ExportResult = io {
-        val source = sourceOf(item)
+    suspend fun toFolder(item: LibraryItem, tree: Uri, format: String? = null): ExportResult = io { using(payload(item, format)) { p ->
+        val source = p.file
+        if (!folderGranted(tree)) throw ClientFailure("vozia.export.folder_unavailable")
         val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val existing = childNames(tree)
-        val name = uniqueName(safeFileName(item.title, extension)) { it in existing }
-        val uri = try { DocumentsContract.createDocument(resolver, parent, item.mime ?: "application/octet-stream", name) } catch (e: Exception) { throw mapFailure(e) }
+        val name = uniqueName(safeFileName(item.title, p.extension)) { it in existing }
+        val uri = try { DocumentsContract.createDocument(resolver, parent, p.mime, name) } catch (e: Exception) { throw mapFailure(e) }
             ?: throw ClientFailure("vozia.export.folder_unavailable")
         try {
             copyVerified(source, uri)
@@ -99,16 +115,20 @@ class Exporter(context: Context, private val library: Library) {
             runCatching { DocumentsContract.deleteDocument(resolver, uri) }
             throw mapFailure(e)
         }
-    }
+    } }
 
     /** "Save as": the system picker already asked about names and replacement. */
-    suspend fun toDocument(item: LibraryItem, uri: Uri): ExportResult = io {
-        val source = sourceOf(item)
+    suspend fun toDocument(item: LibraryItem, uri: Uri, format: String? = null): ExportResult = io { using(payload(item, format)) { p ->
+        val source = p.file
         try { copyVerified(source, uri) } catch (e: Exception) { throw mapFailure(e) }
-        val name = displayName(uri) ?: safeFileName(item.title, extensionOf(item))
+        val name = displayName(uri) ?: safeFileName(item.title, p.extension)
         library.recordExport(item.id, uri.toString(), name, name, source.length())
         ExportResult(uri, name, name, source.length())
-    }
+    } }
+    /** Suggested name and MIME type for the system "Save as" picker. */
+    fun suggestion(item: LibraryItem, format: String? = null): Pair<String, String> =
+        if (format == "m4a" && item.mime == "audio/wav") safeFileName(item.title, "m4a") to "audio/mp4"
+        else safeFileName(item.title, extensionOf(item)) to (item.mime ?: "application/octet-stream")
 
     fun persistFolder(tree: Uri) {
         resolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)

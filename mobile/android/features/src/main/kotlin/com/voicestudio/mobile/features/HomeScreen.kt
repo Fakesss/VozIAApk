@@ -32,7 +32,11 @@ private val destinations = listOf(
     HomeDestination("speak", "mobile.tabs.speak", "mobile.speak.placeholder", VSIcons.Wave, true),
     HomeDestination("voices", "nav.clone", "clone.reference_hint", Icons.Default.Person, true),
     HomeDestination("dub", "nav.dub", "homeUi.dub", VSIcons.Video, true),
+    HomeDestination("audiobooks", "vozia.audiobook.title", "vozia.audiobook.card", Icons.Default.Menu, true),
+    HomeDestination("transcribe", "vozia.transcribe.title", "vozia.transcribe.card", Icons.Default.Edit),
     HomeDestination("dictate", "nav.dictation", "mobile.dictate.tap_to_start", VSIcons.Mic),
+    HomeDestination("library", "vozia.library.title", "vozia.library.card", VSIcons.Folder),
+    HomeDestination("tasks", "vozia.task.title", "vozia.task.card", Icons.Default.Refresh),
     HomeDestination("models", "mobile.local.models", "mobile.local.installed", VSIcons.Download),
     HomeDestination("connect", "mobile.local.my_computer", "mobile.local.pair_settings", VSIcons.Computer),
 )
@@ -52,7 +56,7 @@ private val destinations = listOf(
         Column(Modifier.widthIn(max=900.dp).fillMaxWidth().align(Alignment.CenterHorizontally), verticalArrangement=Arrangement.spacedBy(VSTheme.gap*2)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment=Alignment.CenterVertically) {
                 Text(tr("nav.home"), Modifier.weight(1f).semantics { heading() }, style=MaterialTheme.typography.titleMedium)
-                TextButton(onClick={navigate("projects")}) { Icon(VSIcons.Folder,null); Text(tr("projects.title")) }
+                TextButton(onClick={navigate("library")}) { Icon(VSIcons.Folder,null); Text(tr("vozia.library.title")) }
             }
             Surface(shape=MaterialTheme.shapes.large, color=role("canvas")) {
                 Box {
@@ -76,7 +80,7 @@ private val destinations = listOf(
             HomeSection("projects.generated_audio") {
                 if(phone.recent.isEmpty()&&host.history.isEmpty()) HomeEmpty("mobile.speak.empty_recent")
                 phone.recent.take(4).forEach { item ->
-                    HomeRow(item.text,tr("mobile.local.this_phone"),Icons.Default.PlayArrow,Modifier.testTag("home.audio.${item.id}")) {
+                    HomeRow(item.title,tr("mobile.local.this_phone"),Icons.Default.PlayArrow,Modifier.testTag("home.audio.${item.id}")) {
                         audioSource="phone";vm.phone.play(item)
                     }
                 }
@@ -88,7 +92,7 @@ private val destinations = listOf(
                 if(audioSource=="phone") phone.audio?.let {LocalAudioPlayer(it,vm::fail)}
                 if(audioSource=="computer") vm.api?.let {api -> host.audio?.let {HostPlayer(api,it,vm::fail)} }
             }
-            HomeSection("projects.title") {
+            HomeSection("vozia.home.dubs") {
                 if(phone.dubs.isEmpty()&&host.dubHistory.isEmpty()) HomeEmpty("projects.empty")
                 phone.dubs.take(4).forEach { record ->
                     HomeRow(record.request.title,tr(if(record.checkpoint.done) "mobile.local.this_phone" else record.checkpoint.stage),VSIcons.Video,Modifier.testTag("home.project.${record.request.id}")) {

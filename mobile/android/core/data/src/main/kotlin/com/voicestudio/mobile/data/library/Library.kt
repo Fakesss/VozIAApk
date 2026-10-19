@@ -28,8 +28,9 @@ data class DeletionReport(val items: Int, val bytes: Long, val exportedCopies: I
  * SQLite database holds their metadata, checksums and export locations. Files are
  * written to a sibling `.part` file, synced, and renamed into place before their
  * row is committed, so an interrupted write never leaves a row without its file.
+ * Tests may create isolated instances; the app shares one through [get].
  */
-class Library internal constructor(context: Context, databaseName: String? = "library.db", val root: File = File(context.applicationContext.filesDir, "library")) {
+class Library(context: Context, databaseName: String? = "library.db", val root: File = File(context.applicationContext.filesDir, "library")) {
     private val app = context.applicationContext
     private val db = LibraryDatabase(app, databaseName)
     val temp: File = File(app.cacheDir, "library-tmp")

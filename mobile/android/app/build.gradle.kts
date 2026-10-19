@@ -11,13 +11,47 @@ android {
     compileSdk = 36
     ndkVersion = providers.environmentVariable("ANDROID_NDK_VERSION").orElse("27.1.12297006").get()
     defaultConfig {
-        applicationId = "com.voicestudio.mobile"
+        // A separate application id: installs beside the official VoiceStudio app instead of replacing it.
+        applicationId = "io.github.fakesss.vozia"
         minSdk = 29
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         targetSdk = 36
-        versionCode = appVersion.split(".").take(3).map { it.toInt() }.let { it[0]*1000000+it[1]*1000+it[2] }
-        versionName = appVersion
+        // Upstream version x.y.z becomes x*10^8+y*10^5+z*100 plus this fork's build number;
+        // -PvoziaBuild=N (CI) raises it so every update installs over the previous one.
+        val build = providers.gradleProperty("voziaBuild").orElse("1").get().toInt()
+        versionCode = appVersion.split(".").take(3).map { it.toInt() }.let { it[0]*100_000_000+it[1]*100_000+it[2]*100 } + build
+        versionName = "$appVersion-vozia.$build"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        // A fixed, public debug key so debug builds from CI and local machines update each other.
+        getByName("debug") {
+            storeFile = rootDir.resolve("keystore/debug.keystore")
+            storePassword = "android"; keyAlias = "androiddebugkey"; keyPassword = "android"
+        }
+        // The release key never lives in the repository: pass it via environment variables.
+        val keystore = providers.environmentVariable("VOZIA_KEYSTORE").orNull
+        if (keystore != null) create("release") {
+            storeFile = file(keystore)
+            storePassword = providers.environmentVariable("VOZIA_KEYSTORE_PASSWORD").get()
+            keyAlias = providers.environmentVariable("VOZIA_KEY_ALIAS").orElse("vozia").get()
+            keyPassword = providers.environmentVariable("VOZIA_KEY_PASSWORD").orElse(providers.environmentVariable("VOZIA_KEYSTORE_PASSWORD")).get()
+        }
+    }
+    buildTypes {
+        getByName("debug") { signingConfig = signingConfigs.getByName("debug") }
+        getByName("release") {
+            // JNI looks sherpa-onnx config fields up by name, so the release build is not obfuscated.
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset(); include("arm64-v8a", "x86_64")
+            isUniversalApk = true
+        }
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -53,7 +87,7 @@ val bundleCatalogs by tasks.registering {
         contracts.resolve("models.json").copyTo(assets.resolve("models.json"), overwrite = true)
         contracts.resolve("tokens.json").copyTo(assets.resolve("tokens.json"), overwrite = true)
         val en = JsonSlurper().parse(catalogs.resolve("en.json")) as Map<*, *>
-        val label = (en["app"] as Map<*, *>)["name"].toString()
+        val label = (en["app"] as Map<*, *>)["name"].toString() + " VozIA"
         val res = layout.buildDirectory.dir("generated/catalogResources/values").get().asFile.apply { mkdirs() }
         res.resolve("strings.xml").writeText("<resources><string name=\"app_name\">$label</string></resources>")
     }

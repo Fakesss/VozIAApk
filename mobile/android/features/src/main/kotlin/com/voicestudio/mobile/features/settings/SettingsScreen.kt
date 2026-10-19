@@ -15,7 +15,7 @@ import com.voicestudio.mobile.features.*
 import com.voicestudio.mobile.designsystem.*
 import com.voicestudio.mobile.l10n.L10n
 
-@Composable fun SettingsScreen(vm:StudioViewModel,version:String,onConnect:()->Unit = {},onModels:()->Unit = {}) {
+@Composable fun SettingsScreen(vm:StudioViewModel,version:String,onConnect:()->Unit = {},onModels:()->Unit = {},onLibrary:()->Unit = {},onTasks:()->Unit = {}) {
     val prefs by vm.preferences.collectAsState()
     val state by vm.state.collectAsState()
     val context=LocalContext.current
@@ -28,6 +28,9 @@ import com.voicestudio.mobile.l10n.L10n
         ScreenTitle("mobile.tabs.settings")
         SettingsLink("mobile.tabs.connect",onClick=onConnect)
         SettingsLink("mobile.local.models",onClick=onModels)
+        SettingsLink("vozia.library.title",onClick=onLibrary)
+        SettingsLink("vozia.task.title",onClick=onTasks)
+        StorageSettings(vm)
         if(state.connected) {
             Heading("mobile.settings.connection")
             SettingsLink("mobile.settings.connection",prefs.activeUrl.orEmpty(),onConnect)
@@ -57,6 +60,7 @@ import com.voicestudio.mobile.l10n.L10n
         Group {Toggle("mobile.simple.analytics",prefs.consent==true) {vm.consent(it)}}
         Heading("mobile.settings.about")
         SettingsLink("mobile.android.app_name",version) {licenses=true}
+        Text(tr("vozia.about.fork"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
         SettingsLink("mobile.settings.licenses") {licenses=true}
         if(state.connected) SettingsLink("mobile.android.model_licenses") {context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(vm.api!!.address.baseUrl.toString())))}
     }
@@ -65,4 +69,34 @@ import com.voicestudio.mobile.l10n.L10n
         val content=remember {context.assets.list("licenses").orEmpty().sorted().joinToString("\n\n") {name -> context.assets.open("licenses/$name").bufferedReader().use {it.readText()}}}
         Text(content,Modifier.verticalScroll(rememberScrollState()))
     },confirmButton={TextButton(shape=MaterialTheme.shapes.small,onClick={licenses=false}) {Text(tr("common.close"))}})
+}
+
+/** Private storage use, the export folder grant, and temporary-file cleanup. */
+@Composable private fun StorageSettings(vm: StudioViewModel) {
+    val phone by vm.phone.state.collectAsState()
+    val context=LocalContext.current
+    val library=vm.phone.library
+    var tree by remember {mutableStateOf<Uri?>(null)}
+    var cleaned by remember {mutableStateOf<Long?>(null)}
+    LaunchedEffect(phone.revision) {tree=library.setting(com.voicestudio.mobile.features.library.EXPORT_TREE)?.let(Uri::parse)?.takeIf(vm.phone.exporter::folderGranted)}
+    val pick=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) {uri ->
+        if(uri!=null) vm.phone.launch {vm.phone.exporter.persistFolder(uri);library.putSetting(com.voicestudio.mobile.features.library.EXPORT_TREE,uri.toString())}
+    }
+    Heading("vozia.settings.storage")
+    Group {
+        Column(Modifier.padding(VSTheme.inset),verticalArrangement=Arrangement.spacedBy(VSTheme.gap)) {
+            Text(tr("vozia.settings.usage",mapOf("library" to android.text.format.Formatter.formatFileSize(context,phone.libraryBytes),"models" to android.text.format.Formatter.formatFileSize(context,phone.used))))
+            Text(tr("vozia.settings.private_note"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
+            SettingsLink("vozia.settings.export_folder",tree?.let(vm.phone.exporter::folderLabel) ?: tr("vozia.settings.export_folder_none")) {pick.launch(null)}
+            if(tree!=null) Secondary("vozia.settings.export_folder_clear") {
+                val current=tree
+                vm.phone.launch {
+                    current?.let {runCatching {context.contentResolver.releasePersistableUriPermission(it,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)}}
+                    library.putSetting(com.voicestudio.mobile.features.library.EXPORT_TREE,null)
+                }
+            }
+            Secondary("vozia.settings.clean_temp") {vm.phone.launch {cleaned=library.cleanTemporary()}}
+            cleaned?.let {Text(tr("vozia.settings.cleaned",mapOf("size" to android.text.format.Formatter.formatFileSize(context,it))),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))}
+        }
+    }
 }

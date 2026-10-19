@@ -1,0 +1,179 @@
+{
+ "vozia": {
+  "about": {
+   "fork": "VoiceStudio VozIA for Android, based on VoiceStudio by Palash Debnath and contributors (AGPL-3.0). Source: github.com/Fakesss/VozIAApk."
+  },
+  "home": {
+   "dubs": "Dubbing projects"
+  },
+  "engine": {
+   "system": "Android system voice",
+   "system_detail": "Built in, offline, no download",
+   "download_size": "Download {{size}}"
+  },
+  "speak": {
+   "title": "Title (optional)",
+   "characters_one": "{{count}} character",
+   "characters_other": "{{count}} characters",
+   "speed": "Speed {{speed}}×",
+   "system_voice": "Voice {{number}}",
+   "default_voice": "Default voice",
+   "cloned_voice": "Cloned voice on this phone",
+   "system_hint": "Uses the speech engine installed on this phone. For VoiceStudio AI voices, pick a model such as Piper, Supertonic or Kokoro.",
+   "background_hint": "You can leave this screen or close the app; the task continues in the background and appears in Tasks."
+  },
+  "project": {
+   "default_name": "My audio",
+   "destination": "Save to project",
+   "new": "New project",
+   "name": "Project name",
+   "rename": "Rename",
+   "name_required": "Enter a name.",
+   "busy": "Cancel or finish this project's running tasks first.",
+   "empty": "Nothing saved in this project yet.",
+   "kind_general": "Audio",
+   "kind_audiobook": "Audiobook",
+   "kind_transcription": "Transcription",
+   "kind_dub": "Dubbing",
+   "delete_title": "Delete “{{name}}”?",
+   "delete_body": "This permanently deletes {{count}} files ({{size}}) stored inside the app for this project. Copies you exported ({{exports}}) to Downloads or other folders are NOT deleted."
+  },
+  "item": {
+   "speech": "Speech",
+   "chapter": "Chapter",
+   "audiobook": "Full audiobook",
+   "recording": "Recording",
+   "import": "Imported file",
+   "transcript": "Transcript",
+   "subtitle": "Subtitles",
+   "dub": "Dub",
+   "expand": "Show details",
+   "collapse": "Hide details",
+   "copy": "Copy text",
+   "delete_title": "Delete this file?",
+   "delete_body": "The copy inside the app is deleted. Exported copies ({{exports}}) stay where you saved them."
+  },
+  "export": {
+   "title": "Save a copy",
+   "wav": "WAV (lossless)",
+   "m4a": "M4A (smaller)",
+   "downloads": "Save to Downloads",
+   "folder": "Save to folder",
+   "save_as": "Save as…",
+   "open": "Open in another app",
+   "saved_at": "Saved: {{location}}",
+   "history": "Exported to {{location}} · {{time}}",
+   "failed": "The file could not be saved. Try another location.",
+   "no_space": "Not enough free space for this file. Free up space and try again.",
+   "missing": "The app's copy of this file is missing or damaged.",
+   "folder_unavailable": "The export folder is no longer accessible. Choose it again in Settings.",
+   "name_exhausted": "Too many files with this name in the folder.",
+   "no_viewer": "No installed app can open this file."
+  },
+  "storage": {
+   "verify_failed": "Verification failed: the saved file does not match the original. Nothing was reported as saved."
+  },
+  "library": {
+   "title": "Projects",
+   "card": "Your saved audio, books and transcripts",
+   "empty": "No projects yet. Generate speech or create a project.",
+   "items_one": "{{count}} file",
+   "items_other": "{{count}} files",
+   "storage": "Stored privately in the app: {{size}}",
+   "where": "Projects and files stay on this phone after closing the app or restarting. To use a file in other apps, open it and choose Save to Downloads, Save to folder or Save as."
+  },
+  "task": {
+   "title": "Tasks",
+   "card": "Generations and transcriptions in progress",
+   "hint": "Long jobs run in the background with a notification. Interrupted tasks resume automatically.",
+   "empty": "No tasks yet.",
+   "channel": "VoiceStudio tasks",
+   "retry": "Try again",
+   "state_queued": "Waiting",
+   "state_running": "Processing",
+   "state_succeeded": "Done",
+   "state_cancelled": "Cancelled",
+   "state_failed": "Failed",
+   "kind_speech": "Speech",
+   "kind_audiobook": "Audiobook",
+   "kind_transcribe": "Transcription",
+   "queued": "Waiting to start",
+   "running": "Processing",
+   "speaking": "Generating speech",
+   "chapter": "Generating chapters",
+   "merging": "Joining chapters",
+   "decoding": "Reading the media file",
+   "transcribing": "Transcribing",
+   "saving": "Saving",
+   "done": "Done",
+   "cancelled": "Cancelled",
+   "failed": "Failed",
+   "interrupted": "Interrupted; will resume",
+   "resuming": "Resuming after restart",
+   "unknown": "Unknown task type.",
+   "project_missing": "The project was deleted.",
+   "voice_missing": "The selected cloned voice was deleted.",
+   "empty_text": "There is no text to read.",
+   "still_running": "Cancel the task before deleting it."
+  },
+  "audiobook": {
+   "title": "Audiobooks",
+   "card": "Turn books and long texts into chapters of audio",
+   "intro": "Import a .txt, .md or .epub file (or paste text). Chapters are detected from headings such as “Chapter 1”, and each chapter becomes an audio file.",
+   "name": "Audiobook name",
+   "create": "Create audiobook",
+   "empty": "No audiobooks yet.",
+   "open": "Open audiobook",
+   "files": "All files of this project",
+   "step_text": "1. Text",
+   "step_voice": "2. Voice",
+   "step_listen": "3. Listen and export",
+   "import": "Import text file",
+   "paste": "Or paste the text here",
+   "split": "Split into chapters",
+   "no_chapters": "No chapters yet. Import or paste a text.",
+   "part_title": "Part {{number}}",
+   "summary": "{{count}} chapters · {{characters}} characters",
+   "merge": "Also create one file with the whole book",
+   "generate": "Generate audiobook",
+   "regenerate": "Discard generated chapters",
+   "edit_chapter": "Edit chapter",
+   "chapter_title": "Chapter title",
+   "chapter_text": "Chapter text",
+   "chapter_state_pending": "Not generated",
+   "chapter_state_running": "Generating",
+   "chapter_state_done": "Generated",
+   "too_large": "The file is larger than 20 MB.",
+   "unreadable": "This file could not be read as text or EPUB.",
+   "chapters_generated": "Some chapters already have audio. Discard them before replacing the text.",
+   "mixed_rates": "Chapters were generated with different voices; regenerate them with one voice."
+  },
+  "transcribe": {
+   "title": "Transcribe",
+   "card": "Audio and video to text and subtitles",
+   "intro": "Transcribes on this phone with Whisper. You get the text and SRT/VTT subtitles with timestamps.",
+   "pick": "Choose audio or video",
+   "recording_name": "Recording",
+   "history": "Transcriptions",
+   "empty": "No transcriptions yet.",
+   "open": "Open transcription",
+   "start": "Transcribe"
+  },
+  "settings": {
+   "storage": "Storage and export",
+   "usage": "App files: {{library}} · Models: {{models}}",
+   "private_note": "App files are private and kept across restarts and updates. Uninstalling the app deletes them; exported copies remain.",
+   "export_folder": "Export folder",
+   "export_folder_none": "Not chosen",
+   "export_folder_clear": "Forget export folder",
+   "clean_temp": "Delete temporary files",
+   "cleaned": "Freed {{size}}"
+  }
+ },
+ "mobile": {
+  "local": {
+   "system_tts_unavailable": "No speech engine is installed on this phone. Install one (for example Speech Services by Google) or download a VoiceStudio model.",
+   "system_tts_language": "The phone's speech engine has no voice for this language. Pick another language or a VoiceStudio model."
+  }
+ }
+}

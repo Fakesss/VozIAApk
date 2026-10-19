@@ -18,6 +18,7 @@ import urllib.request
 
 CONTRACT = pathlib.Path(__file__).resolve().parents[1]
 ALLOWED_PREFIX = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/'
+SHERPA_COMMIT = json.loads((CONTRACT.parent / 'native' / 'pins.json').read_text())['sherpa-onnx']['source']['commit']
 
 
 def digest(stream):
@@ -74,7 +75,8 @@ def entry(spec, cache):
     licence['terms_fingerprint'] = terms_fingerprint(licence['terms'])
     result = {key: spec[key] for key in ('id', 'name', 'capability', 'runtime')}
     result.update({
-        'repo': '', 'revision': '',
+        # Provenance: the sherpa-onnx source release whose runtime reads these archives.
+        'repo': 'k2-fsa/sherpa-onnx', 'revision': SHERPA_COMMIT,
         'archive': {'url': spec['archive']['url'], 'sha256': archive_sha, 'size': archive_size, 'root': spec['archive']['root']},
         'files': files,
         'languages': spec['languages'],

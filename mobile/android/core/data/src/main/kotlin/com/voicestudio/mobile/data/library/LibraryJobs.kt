@@ -27,7 +27,7 @@ object TaskKind { const val SPEECH = "speech"; const val AUDIOBOOK = "audiobook"
 @Serializable data class TranscriptMeta(val segments: List<SpeechSegment>)
 data class JobResult(val itemId: String?)
 
-internal val TaskJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+val TaskJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
 /** Speech/voice engine seen by jobs; tests replace it without native libraries. */
 interface JobEngine {
@@ -115,16 +115,18 @@ class LibraryJobs(private val library: Library, private val engine: JobEngine) {
         val rate = files.map { waveFormat(it).first }.distinct().singleOrNull() ?: throw ClientFailure("vozia.audiobook.mixed_rates")
         val output = File(scratch.apply { mkdirs() }, "book.wav")
         val marks = mutableListOf<ChapterMark>()
+        var frames = 0L
         WaveWriter(output, rate).use { writer ->
             files.forEachIndexed { index, file ->
                 if (index > 0) writer.silence(input.gapSeconds)
                 marks += ChapterMark(chapters[index].title, writer.frames * 1000 / rate)
                 appendWave(file, writer)
             }
+            frames = writer.frames
         }
         library.items(project, listOf(ItemKind.AUDIOBOOK)).forEach { library.deleteItem(it.id) }
         val name = library.project(project)?.name ?: "Audiobook"
-        val durationMs = (output.length() - 44) / 2 * 1000 / rate
+        val durationMs = frames * 1000 / rate
         val item = library.addFile(project, ItemKind.AUDIOBOOK, name, "", output, "audio/wav", "wav", engine = input.choice.model,
             voice = input.choice.speakerName, language = input.choice.language, durationMs = durationMs,
             meta = TaskJson.encodeToString(AudiobookMeta.serializer(), AudiobookMeta(marks)))
@@ -204,6 +206,7 @@ class LibraryJobs(private val library: Library, private val engine: JobEngine) {
             progress((index + 1f) / chunks.size)
         }
         val output = File(directory, "out.wav")
+        var frames = 0L
         WaveWriter(output, rate).use { writer ->
             chunks.indices.forEach { index ->
                 if (index > 0) writer.silence(GAP)
@@ -214,8 +217,9 @@ class LibraryJobs(private val library: Library, private val engine: JobEngine) {
                     writer.write(pcm.read(offset, count).samples); offset += count
                 }
             }
+            frames = writer.frames
         }
-        return Rendered(output, (output.length() - 44) / 2 * 1000 / rate)
+        return Rendered(output, frames * 1000 / rate)
     }
 
     companion object {

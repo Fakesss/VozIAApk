@@ -35,8 +35,17 @@ import com.voicestudio.mobile.features.dub.DubScreen
 import com.voicestudio.mobile.features.dictate.DictateScreen
 import com.voicestudio.mobile.features.settings.SettingsScreen
 import java.util.Locale
+import kotlinx.coroutines.launch
 
-class VoiceStudioApplication:Application()
+class VoiceStudioApplication:Application() {
+    override fun onCreate() {
+        super.onCreate()
+        // Finish interrupted writes and re-enqueue tasks a killed process left waiting.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching {com.voicestudio.mobile.data.library.LibraryWorker.resumeAll(this@VoiceStudioApplication,com.voicestudio.mobile.data.library.Library.get(this@VoiceStudioApplication))}
+        }
+    }
+}
 class MainActivity:ComponentActivity() {
     override fun onCreate(savedInstanceState:Bundle?) {
         setTheme(R.style.AppTheme)
@@ -75,7 +84,7 @@ class MainActivity:ComponentActivity() {
                     val tabs=listOf("home","voices","dub","dictate","settings")
                     tabs.forEach {tab ->
                         val label=if(tab=="home") l.t("nav.home") else if(tab=="connect") l.t("mobile.tabs.connect") else l.t("mobile.tabs.$tab")
-                        NavigationBarItem(selected=route==tab || (tab=="home" && (route=="speak" || route.startsWith("voice/") || route.startsWith("host-voice/") || route.startsWith("project"))),onClick={dismissKeyboard();nav.navigate(tab) {popUpTo(nav.graph.startDestinationId) {saveState=true};launchSingleTop=true;restoreState=tab!="home"}},
+                        NavigationBarItem(selected=route==tab || (tab=="home" && (route=="speak" || route.startsWith("voice/") || route.startsWith("host-voice/") || route.startsWith("project") || route.startsWith("library") || route=="tasks" || route.startsWith("audiobook") || route.startsWith("transcribe"))),onClick={dismissKeyboard();nav.navigate(tab) {popUpTo(nav.graph.startDestinationId) {saveState=true};launchSingleTop=true;restoreState=tab!="home"}},
                             icon={Icon(when(tab) {"home" -> Icons.Default.Home;"speak" -> Icons.Default.PlayArrow;"voices" -> Icons.Default.Person;"dub" -> Icons.AutoMirrored.Filled.List;"dictate" -> Icons.Default.Edit;"connect" -> Icons.Default.Add;else -> Icons.Default.Settings},contentDescription=label)},
                             label=if(LocalDensity.current.fontScale<=1.5f) {{Text(label)}} else null,
                             colors=NavigationBarItemDefaults.colors(indicatorColor=role("messageSurface"),selectedIconColor=role("messageAction"),selectedTextColor=role("toolbarForeground"),unselectedIconColor=role("textMuted"),unselectedTextColor=role("textMuted")))
@@ -112,7 +121,15 @@ class MainActivity:ComponentActivity() {
                         enterTransition={androidx.compose.animation.EnterTransition.None}, exitTransition={androidx.compose.animation.ExitTransition.None},
                         popEnterTransition={androidx.compose.animation.EnterTransition.None}, popExitTransition={androidx.compose.animation.ExitTransition.None}) {
                         composable("connect") {ConnectScreen(vm)}
-                        composable("settings") {SettingsScreen(vm,BuildConfig.VERSION_NAME,onConnect={nav.navigate("connect")},onModels={nav.navigate("models")})}
+                        composable("settings") {SettingsScreen(vm,BuildConfig.VERSION_NAME,onConnect={nav.navigate("connect")},onModels={nav.navigate("models")},onLibrary={nav.navigate("library")},onTasks={nav.navigate("tasks")})}
+                        composable("library") {com.voicestudio.mobile.features.library.LibraryScreen(vm) {nav.navigate("library/${it.id}")}}
+                        composable("library/{id}") {entry -> com.voicestudio.mobile.features.library.ProjectScreen(vm,entry.arguments?.getString("id").orEmpty(),deleted={nav.popBackStack()},
+                            openAudiobook={nav.navigate("audiobook/$it")},openTranscription={nav.navigate("transcribe/$it")})}
+                        composable("tasks") {com.voicestudio.mobile.features.library.TasksScreen(vm)}
+                        composable("audiobooks") {com.voicestudio.mobile.features.library.AudiobooksScreen(vm) {nav.navigate("audiobook/$it")}}
+                        composable("audiobook/{id}") {entry -> com.voicestudio.mobile.features.library.AudiobookScreen(vm,entry.arguments?.getString("id").orEmpty()) {nav.navigate("library/$it")}}
+                        composable("transcribe") {com.voicestudio.mobile.features.library.TranscribeScreen(vm,null) {nav.navigate("transcribe/$it")}}
+                        composable("transcribe/{id}") {entry -> com.voicestudio.mobile.features.library.TranscribeScreen(vm,entry.arguments?.getString("id")) {nav.navigate("transcribe/$it")}}
                         composable("models") {com.voicestudio.mobile.features.models.ModelsScreen(vm)}
                         composable("home") {HomeScreen(vm) {nav.navigate(it)}}
                         composable("host-dubs") {com.voicestudio.mobile.features.dub.ComputerDubScreen(vm)}

@@ -68,7 +68,7 @@ const val SYSTEM_TTS_RUNTIME = "android-tts"
 const val SYSTEM_TTS_ID = "android-system-tts"
 internal const val ARCHIVE_PREFIX = "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
 /** Listed first so Speak works before any download; it is not part of models.json. */
-fun systemTtsModel(languages: List<String>): PhoneModel = PhoneModel(SYSTEM_TTS_ID, "tts", SYSTEM_TTS_RUNTIME,
+fun systemTtsModel(languages: List<String>): PhoneModel = PhoneModel(SYSTEM_TTS_ID, "tts", SYSTEM_TTS_RUNTIME, repo = "android.speech.tts",
     files = emptyList(), totalBytes = 0, languages = languages, minRamGb = 0.0, name = "Android",
     licence = ModelLicence("system", "commercial-ok", false, "Android TextToSpeech", "Device text-to-speech engine", "0".repeat(64)))
 

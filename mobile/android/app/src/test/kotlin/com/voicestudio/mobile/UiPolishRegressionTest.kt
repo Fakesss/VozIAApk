@@ -45,7 +45,9 @@ class UiPolishRegressionTest {
             }
             compose.onNodeWithTag("home.speak").performScrollTo().performClick()
             noIdentifiers()
-            compose.onAllNodesWithText("Get").assertCountEquals(1)
+            // Speak needs no download: the built-in system voice is selected and Generate is offered.
+            compose.onAllNodesWithText("Get").assertCountEquals(0)
+            compose.onNodeWithText(com.voicestudio.mobile.l10n.L10n.load(app,"en").t("mobile.speak.generate")).assertExists()
             tab("Voices");noIdentifiers()
             compose.onNodeWithText("Clone a voice").performClick()
             compose.onAllNodesWithText("Get").assertCountEquals(1)

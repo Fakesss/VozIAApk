@@ -1,0 +1,179 @@
+{
+ "vozia": {
+  "about": {
+   "fork": "VoiceStudio VozIA para Android, baseado no VoiceStudio de Palash Debnath e colaboradores (AGPL-3.0). Código-fonte: github.com/Fakesss/VozIAApk."
+  },
+  "home": {
+   "dubs": "Projetos de dublagem"
+  },
+  "engine": {
+   "system": "Voz do sistema Android",
+   "system_detail": "Integrada, offline, sem download",
+   "download_size": "Baixar {{size}}"
+  },
+  "speak": {
+   "title": "Título (opcional)",
+   "characters_one": "{{count}} caractere",
+   "characters_other": "{{count}} caracteres",
+   "speed": "Velocidade {{speed}}×",
+   "system_voice": "Voz {{number}}",
+   "default_voice": "Voz padrão",
+   "cloned_voice": "Voz clonada neste celular",
+   "system_hint": "Usa o mecanismo de voz instalado neste celular. Para as vozes de IA do VoiceStudio, escolha um modelo como Piper, Supertonic ou Kokoro.",
+   "background_hint": "Você pode sair desta tela ou fechar o app; a tarefa continua em segundo plano e aparece em Tarefas."
+  },
+  "project": {
+   "default_name": "Meus áudios",
+   "destination": "Salvar no projeto",
+   "new": "Novo projeto",
+   "name": "Nome do projeto",
+   "rename": "Renomear",
+   "name_required": "Digite um nome.",
+   "busy": "Cancele ou aguarde as tarefas em andamento deste projeto.",
+   "empty": "Nada salvo neste projeto ainda.",
+   "kind_general": "Áudios",
+   "kind_audiobook": "Audiolivro",
+   "kind_transcription": "Transcrição",
+   "kind_dub": "Dublagem",
+   "delete_title": "Excluir “{{name}}”?",
+   "delete_body": "Isto apaga definitivamente {{count}} arquivos ({{size}}) guardados dentro do app para este projeto. As cópias que você exportou ({{exports}}) para Downloads ou outras pastas NÃO serão apagadas."
+  },
+  "item": {
+   "speech": "Fala",
+   "chapter": "Capítulo",
+   "audiobook": "Audiolivro completo",
+   "recording": "Gravação",
+   "import": "Arquivo importado",
+   "transcript": "Transcrição",
+   "subtitle": "Legendas",
+   "dub": "Dublagem",
+   "expand": "Mostrar detalhes",
+   "collapse": "Ocultar detalhes",
+   "copy": "Copiar texto",
+   "delete_title": "Excluir este arquivo?",
+   "delete_body": "A cópia dentro do app será apagada. As cópias exportadas ({{exports}}) continuam onde você as salvou."
+  },
+  "export": {
+   "title": "Salvar uma cópia",
+   "wav": "WAV (sem perdas)",
+   "m4a": "M4A (menor)",
+   "downloads": "Salvar em Downloads",
+   "folder": "Salvar na pasta",
+   "save_as": "Salvar como…",
+   "open": "Abrir em outro app",
+   "saved_at": "Salvo em: {{location}}",
+   "history": "Exportado para {{location}} · {{time}}",
+   "failed": "Não foi possível salvar o arquivo. Tente outro local.",
+   "no_space": "Espaço livre insuficiente para este arquivo. Libere espaço e tente novamente.",
+   "missing": "A cópia deste arquivo no app está ausente ou danificada.",
+   "folder_unavailable": "A pasta de exportação não está mais acessível. Escolha-a novamente em Configurações.",
+   "name_exhausted": "Há arquivos demais com este nome na pasta.",
+   "no_viewer": "Nenhum app instalado consegue abrir este arquivo."
+  },
+  "storage": {
+   "verify_failed": "Falha na verificação: o arquivo salvo não corresponde ao original. Nada foi informado como salvo."
+  },
+  "library": {
+   "title": "Projetos",
+   "card": "Seus áudios, livros e transcrições salvos",
+   "empty": "Nenhum projeto ainda. Gere uma fala ou crie um projeto.",
+   "items_one": "{{count}} arquivo",
+   "items_other": "{{count}} arquivos",
+   "storage": "Guardado de forma privada no app: {{size}}",
+   "where": "Projetos e arquivos continuam neste celular depois de fechar o app ou reiniciar. Para usar um arquivo em outros apps, abra-o e escolha Salvar em Downloads, Salvar na pasta ou Salvar como."
+  },
+  "task": {
+   "title": "Tarefas",
+   "card": "Gerações e transcrições em andamento",
+   "hint": "Trabalhos longos rodam em segundo plano com notificação. Tarefas interrompidas são retomadas automaticamente.",
+   "empty": "Nenhuma tarefa ainda.",
+   "channel": "Tarefas do VoiceStudio",
+   "retry": "Tentar novamente",
+   "state_queued": "Aguardando",
+   "state_running": "Processando",
+   "state_succeeded": "Concluída",
+   "state_cancelled": "Cancelada",
+   "state_failed": "Falhou",
+   "kind_speech": "Fala",
+   "kind_audiobook": "Audiolivro",
+   "kind_transcribe": "Transcrição",
+   "queued": "Aguardando início",
+   "running": "Processando",
+   "speaking": "Gerando a fala",
+   "chapter": "Gerando capítulos",
+   "merging": "Juntando capítulos",
+   "decoding": "Lendo o arquivo de mídia",
+   "transcribing": "Transcrevendo",
+   "saving": "Salvando",
+   "done": "Concluída",
+   "cancelled": "Cancelada",
+   "failed": "Falhou",
+   "interrupted": "Interrompida; será retomada",
+   "resuming": "Retomando após reinício",
+   "unknown": "Tipo de tarefa desconhecido.",
+   "project_missing": "O projeto foi excluído.",
+   "voice_missing": "A voz clonada escolhida foi excluída.",
+   "empty_text": "Não há texto para ler.",
+   "still_running": "Cancele a tarefa antes de excluí-la."
+  },
+  "audiobook": {
+   "title": "Audiolivros",
+   "card": "Transforme livros e textos longos em capítulos de áudio",
+   "intro": "Importe um arquivo .txt, .md ou .epub (ou cole o texto). Os capítulos são detectados por títulos como “Capítulo 1”, e cada capítulo vira um arquivo de áudio.",
+   "name": "Nome do audiolivro",
+   "create": "Criar audiolivro",
+   "empty": "Nenhum audiolivro ainda.",
+   "open": "Abrir audiolivro",
+   "files": "Todos os arquivos deste projeto",
+   "step_text": "1. Texto",
+   "step_voice": "2. Voz",
+   "step_listen": "3. Ouvir e exportar",
+   "import": "Importar arquivo de texto",
+   "paste": "Ou cole o texto aqui",
+   "split": "Dividir em capítulos",
+   "no_chapters": "Nenhum capítulo ainda. Importe ou cole um texto.",
+   "part_title": "Parte {{number}}",
+   "summary": "{{count}} capítulos · {{characters}} caracteres",
+   "merge": "Criar também um arquivo único com o livro inteiro",
+   "generate": "Gerar audiolivro",
+   "regenerate": "Descartar capítulos gerados",
+   "edit_chapter": "Editar capítulo",
+   "chapter_title": "Título do capítulo",
+   "chapter_text": "Texto do capítulo",
+   "chapter_state_pending": "Não gerado",
+   "chapter_state_running": "Gerando",
+   "chapter_state_done": "Gerado",
+   "too_large": "O arquivo tem mais de 20 MB.",
+   "unreadable": "Não foi possível ler este arquivo como texto ou EPUB.",
+   "chapters_generated": "Alguns capítulos já têm áudio. Descarte-os antes de trocar o texto.",
+   "mixed_rates": "Os capítulos foram gerados com vozes diferentes; gere-os novamente com uma só voz."
+  },
+  "transcribe": {
+   "title": "Transcrever",
+   "card": "Áudio e vídeo em texto e legendas",
+   "intro": "Transcreve neste celular com o Whisper. Você recebe o texto e as legendas SRT/VTT com marcas de tempo.",
+   "pick": "Escolher áudio ou vídeo",
+   "recording_name": "Gravação",
+   "history": "Transcrições",
+   "empty": "Nenhuma transcrição ainda.",
+   "open": "Abrir transcrição",
+   "start": "Transcrever"
+  },
+  "settings": {
+   "storage": "Armazenamento e exportação",
+   "usage": "Arquivos do app: {{library}} · Modelos: {{models}}",
+   "private_note": "Os arquivos do app são privados e permanecem após reiniciar e atualizar. Desinstalar o app os apaga; as cópias exportadas permanecem.",
+   "export_folder": "Pasta de exportação",
+   "export_folder_none": "Não escolhida",
+   "export_folder_clear": "Esquecer pasta de exportação",
+   "clean_temp": "Apagar arquivos temporários",
+   "cleaned": "Liberado: {{size}}"
+  }
+ },
+ "mobile": {
+  "local": {
+   "system_tts_unavailable": "Nenhum mecanismo de voz está instalado neste celular. Instale um (por exemplo, Serviços de fala do Google) ou baixe um modelo do VoiceStudio.",
+   "system_tts_language": "O mecanismo de voz do celular não tem voz para este idioma. Escolha outro idioma ou um modelo do VoiceStudio."
+  }
+ }
+}

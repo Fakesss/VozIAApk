@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.voicestudio.mobile.features.*
 import java.io.File
 import kotlinx.coroutines.*
+import kotlin.math.roundToInt
 
 @Composable private fun ComputerSpeakScreen(vm:StudioViewModel, initialVoiceID: String? = null) {
     val state by vm.state.collectAsState()
@@ -82,59 +83,97 @@ import kotlinx.coroutines.*
 @Composable fun SpeakScreen(vm: StudioViewModel, initialPhoneVoiceID: String? = null, initialComputerVoiceID: String? = null) {
     com.voicestudio.mobile.features.models.TaskLocation(vm,"speak",setOf("tts","clone")) {location,model ->
         if(location==com.voicestudio.mobile.local.RunLocation.COMPUTER) ComputerSpeakScreen(vm,initialComputerVoiceID)
-        else {
-            val phone by vm.phone.state.collectAsState()
-            val context=LocalContext.current
-            val scope=rememberCoroutineScope()
-            var text by rememberSaveable {mutableStateOf("")}
-            var speaker by rememberSaveable(initialPhoneVoiceID) {mutableStateOf(initialPhoneVoiceID?.let {"phone:"+it} ?: "0")}
-            val voice=phone.voices.firstOrNull {"phone:"+it.id==speaker}
-            val capability=if(voice==null) "tts" else "clone"
-            val selected=model?.takeIf {it.capability==capability} ?: phone.models.firstOrNull {it.capability==capability&&it.id in phone.installed} ?: phone.models.firstOrNull {it.capability==capability}
-            LaunchedEffect(phone.voices) {if(speaker.startsWith("phone:")&&voice==null) speaker="0"}
-            val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) {uri ->
-                val source=phone.audio
-                if(uri!=null&&source!=null) scope.launch {
-                    try {withContext(Dispatchers.IO) {context.contentResolver.openOutputStream(uri)!!.use {out -> source.inputStream().use {it.copyTo(out)}}}}
-                    catch(e:Exception) {vm.fail(e)}
-                }
-            }
-            DisposableEffect(Unit) {onDispose {vm.phone.cancelInference()}}
-            Screen {
-                ScreenTitle("mobile.tabs.speak")
-                Field("mobile.speak.placeholder",text,{text=it},multiline=true)
-                val speakers=selected?.option("num_speakers",selected.option("speaker_count","1"))?.toIntOrNull()?.coerceIn(1,128) ?: 1
-                val validSpeaker=voice!=null||speaker.toIntOrNull()?.let {it in 0 until speakers}==true
-                LaunchedEffect(selected?.id,speakers) {if(voice==null&&!validSpeaker) speaker="0"}
-                var language by rememberSaveable {mutableStateOf("en")}
-                LaunchedEffect(selected?.id,voice?.id) {language=if(voice!=null) "auto" else language.takeIf {it in selected?.languages.orEmpty()} ?: selected?.languages?.firstOrNull().orEmpty()}
-                val languageChoices=if(voice!=null) listOf(Choice("auto",tr("languagePicker.auto"))) else selected?.languages.orEmpty().map {Choice(it,languageName(it,LocalL10n.current.locale))}
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(VSTheme.gap)) {
-                    Box(Modifier.weight(1f)) {ChoicePicker("mobile.speak.voice",speaker,(0 until speakers).map {Choice(it.toString(),tr("mobile.local.preset_voice",mapOf("number" to it+1)))}+phone.voices.map {Choice("phone:"+it.id,it.name)},compact=true) {speaker=it}}
-                    Box(Modifier.weight(1f)) {com.voicestudio.mobile.features.models.TaskModelPicker(vm,"speak",setOf(capability),selected,compact=true)}
-                    Box(Modifier.weight(1f)) {ChoicePicker("mobile.speak.language",language,languageChoices,compact=true) {language=it}}
-                }
-                if(selected?.let {!phone.canRun(it,vm.phone.ramBytes)}!=false) selected?.let {com.voicestudio.mobile.features.models.MissingModelsCard(vm,"mobile.tabs.speak",listOf(it))}
-                else Action("mobile.speak.generate",text.isNotBlank()&&selected!=null&&validSpeaker&&phone.progress==null) {vm.phone.speak(selected!!,text,speaker.toIntOrNull() ?: 0,voice,language.takeUnless {it=="auto"})}
-                phone.progress?.let {p ->
-                    LinearProgressIndicator(progress={p},modifier=Modifier.fillMaxWidth())
-                    Secondary("common.cancel") {vm.phone.cancelInference()}
-                }
-                phone.audio?.let {file ->
-                    LocalAudioPlayer(file,vm::fail)
-                    Secondary("mobile.speak.share") {scope.launch {try {shareLocalFile(context,file,"audio/wav")} catch(e:Exception) {vm.fail(e)}}}
-                    Secondary("common.save") {save.launch(file.name)}
-                }
-                Heading("mobile.speak.recent")
-                if(phone.recent.isEmpty()) EmptyState("mobile.simple.empty_recent")
-                phone.recent.forEach {item ->
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        Text(item.text,Modifier.weight(1f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        IconAction("player.play",Icons.Default.PlayArrow) {vm.phone.play(item)}
-                        IconAction("common.delete",Icons.Default.Delete) {vm.phone.deleteGeneration(item)}
-                    }
-                }
+        else PhoneSpeakScreen(vm,model,initialPhoneVoiceID)
+    }
+}
 
+/** Picks the device language when a model offers it, else the model's first language. */
+fun preferredLanguage(languages: List<String>, device: String): String? {
+    val tag=java.util.Locale.forLanguageTag(device)
+    return languages.firstOrNull {it.equals(device,true)} ?: languages.firstOrNull {java.util.Locale.forLanguageTag(it).language==tag.language} ?: languages.firstOrNull()
+}
+
+@Composable private fun PhoneSpeakScreen(vm: StudioViewModel, model: com.voicestudio.mobile.local.PhoneModel?, initialPhoneVoiceID: String?) {
+    val phone by vm.phone.state.collectAsState()
+    val context=LocalContext.current
+    val scope=rememberCoroutineScope()
+    val l=LocalL10n.current
+    var text by rememberSaveable {mutableStateOf("")}
+    var title by rememberSaveable {mutableStateOf("")}
+    var speed by rememberSaveable {mutableFloatStateOf(1f)}
+    var projectId by rememberSaveable {mutableStateOf<String?>(null)}
+    var speaker by rememberSaveable(initialPhoneVoiceID) {mutableStateOf(initialPhoneVoiceID?.let {"phone:"+it} ?: "0")}
+    val voice=phone.voices.firstOrNull {"phone:"+it.id==speaker}
+    val capability=if(voice==null) "tts" else "clone"
+    val selected=model?.takeIf {it.capability==capability} ?: phone.models.firstOrNull {it.capability==capability&&it.id in phone.installed} ?: phone.models.firstOrNull {it.capability==capability}
+    LaunchedEffect(phone.voices) {if(speaker.startsWith("phone:")&&voice==null) speaker="0"}
+    DisposableEffect(Unit) {onDispose {vm.phone.cancelInference()}}
+    var language by rememberSaveable {mutableStateOf("")}
+    LaunchedEffect(selected?.id,voice?.id,selected?.languages) {
+        language=if(voice!=null) "auto" else language.takeIf {it in selected?.languages.orEmpty()} ?: preferredLanguage(selected?.languages.orEmpty(),l.locale).orEmpty()
+    }
+    // Named presets: the model's catalogue speakers for this language, or the device's offline system voices.
+    val systemVoices by produceState(emptyList<String>(),selected?.id,language) {
+        value=if(selected?.system==true) vm.phone.speech.voices(language.takeUnless {it.isBlank()||it=="auto"}) else emptyList()
+    }
+    val presets: List<Choice> = when {
+        selected==null -> emptyList()
+        selected.system -> systemVoices.mapIndexed {index,name -> Choice(index.toString(),tr("vozia.speak.system_voice",mapOf("number" to index+1)),supporting=name)}.ifEmpty {listOf(Choice("0",tr("mobile.local.preset_voice",mapOf("number" to 1))))}
+        selected.speakers.isNotEmpty() -> selected.speakers.filter {it.language==null||language.isBlank()||it.language.equals(language,true)}.map {Choice(it.id.toString(),it.name,supporting=it.language?.let {code -> languageName(code,l.locale)})}
+        else -> {
+            val count=selected.option("num_speakers",selected.option("speaker_count","1")).toIntOrNull()?.coerceIn(1,128) ?: 1
+            (0 until count).map {Choice(it.toString(),tr("mobile.local.preset_voice",mapOf("number" to it+1)))}
+        }
+    }
+    val validSpeaker=voice!=null||presets.any {it.id==speaker}
+    LaunchedEffect(presets) {if(voice==null&&!validSpeaker) speaker=presets.firstOrNull()?.id ?: "0"}
+    val projects=phone.projects.filter {it.kind==com.voicestudio.mobile.data.library.ProjectKind.GENERAL}
+    Screen {
+        ScreenTitle("mobile.tabs.speak")
+        Field("mobile.speak.placeholder",text,{text=it},multiline=true)
+        Text(tr("vozia.speak.characters",mapOf("count" to text.length)),style=MaterialTheme.typography.labelSmall,color=role("textMuted"))
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(VSTheme.gap)) {
+            Box(Modifier.weight(1f)) {ChoicePicker("mobile.speak.voice",speaker,presets+phone.voices.map {Choice("phone:"+it.id,it.name,supporting=tr("vozia.speak.cloned_voice"))},compact=true) {speaker=it}}
+            Box(Modifier.weight(1f)) {com.voicestudio.mobile.features.models.TaskModelPicker(vm,"speak",setOf(capability),selected,compact=true)}
+            Box(Modifier.weight(1f)) {
+                val languageChoices=if(voice!=null) listOf(Choice("auto",tr("languagePicker.auto"))) else selected?.languages.orEmpty().map {Choice(it,languageName(it,l.locale))}
+                ChoicePicker("mobile.speak.language",language,languageChoices,compact=true) {language=it}
+            }
+        }
+        if(selected?.system==true) Text(tr("vozia.speak.system_hint"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
+        Text(tr("vozia.speak.speed",mapOf("speed" to "%.2f".format(speed))),style=MaterialTheme.typography.labelLarge)
+        Slider(value=speed,onValueChange={speed=(it*20).roundToInt()/20f},valueRange=.5f..2f,steps=29,enabled=voice==null,modifier=Modifier.fillMaxWidth())
+        Field("vozia.speak.title",title,{title=it})
+        ChoicePicker("vozia.project.destination",projectId ?: "",listOf(Choice("",tr("vozia.project.default_name")))+projects.filter {it.id!=phone.defaultProject}.map {Choice(it.id,it.name)}) {projectId=it.ifEmpty {null}}
+        val speaking=phone.speaking
+        val defaultName=tr("vozia.project.default_name")
+        if(selected?.let {!phone.canRun(it,vm.phone.ramBytes)}!=false) selected?.let {com.voicestudio.mobile.features.models.MissingModelsCard(vm,"mobile.tabs.speak",listOf(it))}
+        else Action(if(speaking!=null) "mobile.speak.generating" else "mobile.speak.generate",text.isNotBlank()&&text.length<=200_000&&selected!=null&&validSpeaker&&speaking==null&&phone.speechTask==null) {
+            val name=presets.firstOrNull {it.id==speaker}?.let {it.supporting?.takeIf {_ -> selected!!.system} ?: it.title}
+            vm.phone.speak(selected!!,text,speaker.toIntOrNull() ?: 0,voice,language.takeUnless {it=="auto"||it.isBlank()},speed,projectId,title,name,defaultName)
+        }
+        if(phone.speechTask!=null) {
+            LinearProgressIndicator(progress={phone.progress ?: 0f},modifier=Modifier.fillMaxWidth())
+            Text(tr(speaking?.stage ?: "vozia.task.queued"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
+            Text(tr("vozia.speak.background_hint"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
+            Secondary("common.cancel") {vm.phone.cancelSpeech()}
+        }
+        phone.audioItem?.let {item ->
+            phone.audio?.let {file -> LocalAudioPlayer(file,vm::fail)}
+            val folder=phone.projects.firstOrNull {it.id==item.projectId}?.name
+            com.voicestudio.mobile.features.library.ExportActions(vm,item,folder)
+        }
+        Heading("mobile.speak.recent")
+        if(phone.recent.isEmpty()) EmptyState("mobile.simple.empty_recent")
+        phone.recent.forEach {item ->
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(listOfNotNull(formatDuration(item.durationMs),item.voice,phone.projects.firstOrNull {it.id==item.projectId}?.name).joinToString(" · "),
+                        style=MaterialTheme.typography.bodySmall,color=role("textMuted"),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                IconAction("player.play",Icons.Default.PlayArrow) {vm.phone.play(item)}
+                IconAction("common.delete",Icons.Default.Delete) {vm.phone.deleteGeneration(item)}
             }
         }
     }

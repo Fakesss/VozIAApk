@@ -28,7 +28,7 @@ import com.voicestudio.mobile.local.*
         Text(tr("mobile.local.storage_used",mapOf("size" to Formatter.formatFileSize(LocalContext.current,state.used))))
         Toggle("mobile.simple.mobile_data",preferences.allowMobileModels) {allowed -> vm.preference {it.copy(allowMobileModels=allowed)}}
         if(state.loading) InlineLoading()
-        state.models.forEach {model -> ModelCard(vm,model)}
+        state.models.filterNot {it.system}.forEach {model -> ModelCard(vm,model)}
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,7 +112,9 @@ import com.voicestudio.mobile.local.*
     val preferences by vm.preferences.collectAsState()
     val choices=phone.models.filter {it.capability in capabilities}
     val selected=choices.firstOrNull {it.id==preferences.phoneModels[task]} ?: choices.firstOrNull {it.id in phone.installed&&it.fits(vm.phone.ramBytes)} ?: choices.firstOrNull()
-    val ready=selected?.let {it.id in phone.installed&&it.fits(vm.phone.ramBytes)}==true&&dependencies.all {cap -> phone.models.any {it.capability==cap&&it.id in phone.installed&&it.fits(vm.phone.ramBytes)}}
+    // The built-in system voice keeps Speak usable offline, but a paired computer stays the
+    // default until the person downloads a phone model or picks "This phone".
+    val ready=selected?.let {!it.system&&it.id in phone.installed&&it.fits(vm.phone.ramBytes)}==true&&dependencies.all {cap -> phone.models.any {it.capability==cap&&it.id in phone.installed&&it.fits(vm.phone.ramBytes)}}
     val location=routeTask(preferences.runLocations[task],ready,host.connected)
     Column(Modifier.fillMaxSize()) {
         if(host.connected) Row(Modifier.fillMaxWidth().padding(horizontal=VSTheme.inset),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(VSTheme.gap)) {
@@ -130,7 +132,9 @@ import com.voicestudio.mobile.local.*
 @Composable fun TaskModelPicker(vm: StudioViewModel, task: String, capabilities: Set<String>, selected: PhoneModel?, compact: Boolean = false) {
     val phone by vm.phone.state.collectAsState()
     ChoicePicker("mobile.local.model",selected?.id.orEmpty(),phone.models.filter {it.capability in capabilities}.map {
-        Choice(it.id,it.name,enabled=it.fits(vm.phone.ramBytes),supporting=if(it.fits(vm.phone.ramBytes)) tr("mobile.simple.${it.capability}") else tr("mobile.local.ram_required",mapOf("ram" to it.minRamGb)))
+        Choice(it.id,if(it.system) tr("vozia.engine.system") else it.name,enabled=it.fits(vm.phone.ramBytes),
+            supporting=if(it.system) tr("vozia.engine.system_detail") else if(!it.fits(vm.phone.ramBytes)) tr("mobile.local.ram_required",mapOf("ram" to it.minRamGb))
+                else if(it.id in phone.installed) tr("mobile.local.installed") else tr("vozia.engine.download_size",mapOf("size" to android.text.format.Formatter.formatFileSize(LocalContext.current,it.archive?.size ?: it.totalBytes))))
     },compact=compact) {id -> vm.phone.cancelInference();vm.preference {it.copy(phoneModels=it.phoneModels+(task to id))}}
 }
 
