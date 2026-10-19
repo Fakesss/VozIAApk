@@ -26,7 +26,7 @@ class PhoneDubInferenceTest {
         assumeTrue(args.getString("dubInferenceSmoke")=="true")
         val app=InstrumentationRegistry.getInstrumentation().targetContext
         val catalog=app.assets.open("models.json").bufferedReader().use {ModelCatalog.decode(it.readText())}
-        val tts=catalog.models.filter {it.capability=="tts"}.minBy {it.totalBytes}
+        val tts=catalog.models.filter {it.capability=="tts"&&"en" in it.languages}.minBy {it.totalBytes}
         val models=listOf(catalog.models.filter {it.capability=="asr"}.minBy {it.totalBytes},catalog.models.first {it.capability=="translate"},catalog.models.first {it.capability=="clone"})
         val ram=ActivityManager.MemoryInfo().also {app.getSystemService(ActivityManager::class.java).getMemoryInfo(it)}.totalMem
         assumeTrue("Use a device with the declared model RAM",(models+tts).all {it.fits(ram)})

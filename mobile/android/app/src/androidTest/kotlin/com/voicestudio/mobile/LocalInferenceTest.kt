@@ -28,7 +28,7 @@ class LocalInferenceTest {
         assumeTrue(arguments.getString("localInferenceSmoke")=="true")
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val catalogue=context.assets.open("models.json").bufferedReader().use {ModelCatalog.decode(it.readText())}
-        val tts=catalogue.models.filter {it.capability=="tts"}.minBy {it.totalBytes}
+        val tts=catalogue.models.filter {it.capability=="tts"&&"en" in it.languages}.minBy {it.totalBytes}
         val asr=catalogue.models.filter {it.capability=="asr"}.minBy {it.totalBytes}
         val stream=catalogue.models.first {it.capability=="asr-stream"}
         val ram=android.app.ActivityManager.MemoryInfo().also {context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(it)}.totalMem
@@ -62,7 +62,7 @@ class LocalInferenceTest {
         assumeTrue(args.getString("cloneInferenceSmoke")=="true")
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val catalog=context.assets.open("models.json").bufferedReader().use {ModelCatalog.decode(it.readText())}
-        val tts=catalog.models.filter {it.capability=="tts"}.minBy {it.totalBytes}
+        val tts=catalog.models.filter {it.capability=="tts"&&"en" in it.languages}.minBy {it.totalBytes}
         val asr=catalog.models.filter {it.capability=="asr"}.minBy {it.totalBytes}
         val clone=catalog.models.first {it.capability=="clone"}
         val ram=android.app.ActivityManager.MemoryInfo().also {context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(it)}.totalMem
