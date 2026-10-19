@@ -7,10 +7,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   ANDROID_NDK_VERSION: 27.1.12297006
   ANDROID_CMAKE_VERSION: 3.22.1
