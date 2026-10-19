@@ -36,11 +36,17 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
     init {
         scope.launch {
             try {
-                val models=withContext(Dispatchers.IO) {runtime.models()}
+                // Models for the device language come first, so the suggested download speaks it.
+                val language=java.util.Locale.getDefault().language
+                val models=withContext(Dispatchers.IO) {runtime.models()}.filterNot {it.system}
+                    .sortedByDescending {model -> model.languages.any {java.util.Locale.forLanguageTag(it).language==language}}
                 mutable.update {it.copy(models=models,loading=false)};refresh()
-                // The engine list can take a moment to bind; Speak shows the system voice meanwhile.
+                // The system voice is offered only when the device has an offline engine voice.
                 val languages=speech.languages()
-                mutable.update {state -> state.copy(models=state.models.map {if(it.system) systemTtsModel(languages) else it})}
+                if(languages.isNotEmpty()) {
+                    mutable.update {state -> state.copy(models=listOf(systemTtsModel(languages))+state.models)}
+                    refresh()
+                }
             } catch(e:CancellationException) {throw e} catch(e:Exception) {mutable.update {it.copy(loading=false)};failure(ClientFailure("mobile.local.catalogue_failed"))}
         }
         scope.launch {
