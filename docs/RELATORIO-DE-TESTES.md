@@ -37,6 +37,28 @@ O OmniVoice usou 2 threads nesse servidor (metade dos núcleos); no celular o ap
 rápidos. Mesmo assim, clonagem continua sendo o recurso mais pesado: conte segundos a minutos por
 frase. A opção **Clonagem rápida** (16 passos) reduz o tempo pela metade.
 
+### Todos os modelos de voz no emulador, em sequência no mesmo processo
+
+Teste `VoziaModelMatrixTest` (Android 14, emulador x86_64): baixa cada modelo e gera fala pela mesma
+tarefa em segundo plano da tela Falar, com o texto “Olá! Ele disse “bom dia” — «teste» … 😀.” (aspas
+curvas, travessão, emoji). No build 9, Piper e Kokoro v1.0 falharam depois do Kitten (lista de vozes do
+espeak); com a pasta completa embutida (build 10) todos passaram:
+
+| Modelo | Idioma | Áudio gerado | Tempo |
+|---|---|---|---|
+| Kitten mini | inglês | 5,5 s | 12,0 s |
+| Kokoro v1.1 | inglês | 3,3 s | 16,8 s |
+| Piper Faber pt-BR | português | 4,1 s | 3,1 s |
+| Supertonic 3 | português | 6,6 s | 6,1 s |
+| Kokoro v1.0 | português (pt-br) | 5,4 s | 14,6 s |
+
+### Clonagem em paralelo (emulador Android 14 com 8 GB)
+
+Teste `VoziaHeavyTaskTest` (build 9): uma fala com voz clonada (OmniVoice) mostra progresso por passo;
+**uma fala com Piper termina em 2,6 s enquanto a clonagem continua**; ao cancelar a clonagem, uma nova
+começa a avançar e conclui com áudio real. No emulador o OmniVoice roda na versão genérica (sem
+aceleração), por isso os tempos absolutos ali não representam o celular.
+
 ## Ambientes
 
 | Ambiente | Detalhes |
@@ -57,10 +79,10 @@ verificação estática (exports JNI, isolamento de símbolos GGML, alinhamento 
 
 ## Testes automatizados (JVM)
 
-162 testes, 0 falhas (`./gradlew testDebugUnitTest`): 137 herdados do upstream (API/pareamento,
-segurança de rede, catálogo, licenças, downloads com retomada, dublagem, UI Robolectric) e 25 novos.
-Os 7 mais recentes cobrem a escolha da versão nativa pelo processador, o progresso dentro de cada trecho
-e trechos curtos para voz clonada, a limpeza do texto, o mapeamento de idiomas do Kokoro, os limites de
+163 testes, 0 falhas (`./gradlew testDebugUnitTest`): 137 herdados do upstream (API/pareamento,
+segurança de rede, catálogo, licenças, downloads com retomada, dublagem, UI Robolectric) e 26 novos.
+Os 8 mais recentes cobrem a escolha da versão nativa pelo processador, o progresso dentro de cada trecho
+e trechos curtos para voz clonada, trechos só com emoji, a limpeza do texto, o mapeamento de idiomas do Kokoro, os limites de
 fala pela energia do som, a pasta espeak compartilhada e os dados espeak embutidos (iguais, byte a byte,
 aos dos modelos). Os 18 anteriores:
 
