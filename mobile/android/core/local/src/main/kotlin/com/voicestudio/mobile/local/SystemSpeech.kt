@@ -133,6 +133,8 @@ class SystemSpeech(context: Context) {
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) { onError(utteranceId, TextToSpeech.ERROR) }
                 override fun onError(utteranceId: String?, errorCode: Int) { if (utteranceId == id && continuation.isActive) continuation.resume(Outcome.ERROR) }
+                // A flushed utterance reports onStop instead of onDone or onError.
+                override fun onStop(utteranceId: String?, interrupted: Boolean) { if (utteranceId == id && continuation.isActive) continuation.resume(Outcome.ERROR) }
             })
             if (tts.synthesizeToFile(text, Bundle(), file, id) != TextToSpeech.SUCCESS && continuation.isActive) continuation.resume(Outcome.ERROR)
             continuation.invokeOnCancellation { runCatching { tts.stop() } }

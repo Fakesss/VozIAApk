@@ -13,6 +13,9 @@ do VoiceStudio, licenciado sob a GNU Affero General Public License v3.0 (somente
   SQLite de projetos, exportação verificada, tarefas WorkManager, audiolivros, transcrição de arquivos,
   ditado com Whisper, novas telas, textos em português, testes e CI com emuladores.
   O histórico completo está no `git log` deste repositório.
+* Bibliotecas nativas de terceiros são compiladas a partir dos commits fixados em `mobile/native/pins.json`.
+  O OmniVoice.cpp (MIT) recebe dois pequenos patches, em `mobile/native/android/patches/`: um gancho por
+  passo de decodificação (progresso e cancelamento) e a escolha do número de threads pelo app.
 * Todo o código-fonte correspondente, inclusive scripts de compilação das bibliotecas nativas, está neste
   repositório. Quem receber o app (inclusive pela rede) tem direito a este código sob a AGPL-3.0.
 

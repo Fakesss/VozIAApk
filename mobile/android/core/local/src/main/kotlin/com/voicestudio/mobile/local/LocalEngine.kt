@@ -286,10 +286,15 @@ internal fun cpuFeatures(cpuinfo: String = runCatching {File("/proc/cpuinfo").re
         .map {it.substringAfter(':').trim().split(Regex("\\s+")).toSet()}
         .reduceOrNull {all,next -> all intersect next}.orEmpty()
 
-/** Native library suffixes to try, fastest first; must match build.sh and verify.py. */
+/**
+ * Native library suffixes to try, fastest first; must match build.sh and verify.py.
+ * Each ARM variant also needs what its -march implies (LSE atomics, RCpc, BF16), so
+ * a CPU missing any of them keeps a slower but safe build.
+ */
 internal fun cpuVariants(features: Set<String>): List<String> = buildList {
-    if(features.containsAll(listOf("asimddp","asimdhp","i8mm"))) add("_i8mm")
-    if(features.containsAll(listOf("asimddp","asimdhp"))) add("_dotprod")
+    val dotprod=listOf("asimddp","asimdhp","fphp","atomics")
+    if(features.containsAll(dotprod+listOf("lrcpc","i8mm","bf16"))) add("_i8mm")
+    if(features.containsAll(dotprod)) add("_dotprod")
     if(features.containsAll(listOf("avx","avx2","fma","f16c","bmi2"))) add("_avx2")
     add("")
 }

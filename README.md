@@ -42,6 +42,19 @@ O app usa o identificador `io.github.fakesss.vozia` e convive com o VoiceStudio 
 
 Capturas reais do app em um emulador Android 14 durante os testes automatizados.
 
+## Se uma tarefa parecer parada
+
+* Em **Tarefas**, cada tarefa mostra a etapa, a porcentagem e há quanto tempo está rodando. "Aguardando
+  outra tarefa liberar o modelo" significa que ela está na fila atrás de outra (por exemplo, uma
+  dublagem); vozes comuns (Piper, Supertonic, Kokoro, voz do sistema) não esperam mais por clonagens ou
+  dublagens.
+* Vozes clonadas e dublagem usam o modelo grande OmniVoice: contam segundos a minutos por frase no
+  celular. O progresso avança a cada passo; dá para cancelar a qualquer momento.
+* Se o Android estiver limitando a bateria do app, tarefas longas podem pausar com a tela desligada.
+  Em **Ajustes → Desempenho e segundo plano**, toque em **Permitir em segundo plano**.
+* Para pedir ajuda, use **Ajustes → Copiar relatório de diagnóstico** (aparelho, aceleração do
+  processador, modelos e últimas tarefas; sem textos nem áudios).
+
 ## Recursos
 
 | Recurso | Estado | Onde |

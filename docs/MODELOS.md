@@ -37,9 +37,23 @@ vêm do Hugging Face, com espelho `hf-mirror.com`, como no upstream.
 | Supertonic/Kokoro, audiolivros longos, Whisper Base | 4 GB de RAM, 1 GB livre |
 | Clonagem (OmniVoice) e dublagem completa (Whisper + Qwen3 + OmniVoice) | 8 GB de RAM, 3 GB livres, celular com refrigeração razoável |
 
-Geração longa (audiolivros) usa CPU por vários minutos: o aparelho esquenta e consome bateria; o app usa
-2–4 threads e roda uma tarefa por vez para limitar memória e aquecimento. Recomenda-se carregador
-conectado para livros longos.
+Geração longa (audiolivros) usa CPU por vários minutos: o aparelho esquenta e consome bateria.
+Recomenda-se carregador conectado para livros longos.
+
+## Como o app usa o processador
+
+* **Duas filas de modelos.** Um modelo grande (OmniVoice ou Qwen3) e um pequeno (Piper, Supertonic,
+  Kokoro, Kitten, Whisper) podem rodar ao mesmo tempo; cada fila atende uma tarefa por vez. Assim uma
+  dublagem ou clonagem não segura as falas comuns, e a memória fica limitada a um modelo de cada tipo.
+* **Aceleração do processador.** O OmniVoice e o llama.cpp (Qwen3) são compilados em três versões para
+  ARM64: genérica (ARMv8.0), com produto escalar e FP16 (ARMv8.2, `dotprod`) e com multiplicação de
+  matrizes int8 (ARMv8.6, `i8mm`). O app lê os recursos do processador em `/proc/cpuinfo` e carrega a mais
+  rápida que todos os núcleos suportam; o Snapdragon 8 Elite usa `i8mm`. Em emuladores x86_64 usa AVX2.
+  A versão em uso aparece em **Ajustes → Desempenho e segundo plano**.
+* **Threads.** OmniVoice e Qwen3 usam os núcleos rápidos do aparelho (até 6, pela capacidade que o kernel
+  informa por núcleo); os modelos pequenos usam 2–4, e 2 quando um modelo grande está rodando ao lado.
+* **Voz clonada.** A referência gravada é reduzida aos primeiros ~12 s (cortando numa pausa), porque o
+  OmniVoice relê a referência inteira a cada frase.
 
 ## Motores do desktop que não rodam no celular
 

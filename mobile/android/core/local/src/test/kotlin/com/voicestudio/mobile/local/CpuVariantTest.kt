@@ -17,11 +17,13 @@ class CpuVariantTest {
     @Test fun picksTheFastestVariantEveryCoreSupports() {
         assertEquals(listOf("_i8mm", "_dotprod", ""), cpuVariants(cpuFeatures(snapdragon8Elite)))
         // Cortex-A55/A76 era: dot product and fp16 but no int8 matrix multiply.
-        assertEquals(listOf("_dotprod", ""), cpuVariants(cpuFeatures("Features\t: fp asimd fphp asimdhp asimddp")))
+        assertEquals(listOf("_dotprod", ""), cpuVariants(cpuFeatures("Features\t: fp asimd atomics fphp asimdhp lrcpc asimddp")))
+        // i8mm without BF16 would still risk instructions the -march allows: use the dotprod build.
+        assertEquals(listOf("_dotprod", ""), cpuVariants(cpuFeatures("Features\t: fp asimd atomics fphp asimdhp lrcpc asimddp i8mm")))
         // Cortex-A53: baseline only.
         assertEquals(listOf(""), cpuVariants(cpuFeatures("Features\t: fp asimd evtstrm aes crc32")))
         // A feature missing on one core rules the variant out for all.
-        assertEquals(listOf("_dotprod", ""), cpuVariants(cpuFeatures("Features\t: asimdhp asimddp i8mm\nFeatures\t: asimdhp asimddp")))
+        assertEquals(listOf("_dotprod", ""), cpuVariants(cpuFeatures("Features\t: atomics fphp asimdhp lrcpc asimddp i8mm bf16\nFeatures\t: atomics fphp asimdhp asimddp")))
         assertEquals(listOf("_avx2", ""), cpuVariants(cpuFeatures("flags\t\t: fpu sse4_2 avx avx2 fma f16c bmi2 popcnt")))
         assertEquals(listOf(""), cpuVariants(cpuFeatures("")))
     }

@@ -69,7 +69,9 @@ fun taskStateKey(state: String) = "vozia.task.state_$state"
 @Composable fun ProjectScreen(vm: StudioViewModel, projectId: String, deleted: () -> Unit, openAudiobook: (String) -> Unit, openTranscription: (String) -> Unit) {
     val phone by vm.phone.state.collectAsState()
     val project = phone.projects.firstOrNull { it.id == projectId }
-    val items by produceState(emptyList<LibraryItem>(), phone.revision, projectId) { value = vm.phone.library.items(projectId) }
+    // null until the first query returns, so neither the empty state nor finished tasks flash meanwhile.
+    val loaded by produceState<List<LibraryItem>?>(null, phone.revision, projectId) { value = vm.phone.library.items(projectId) }
+    val items = loaded.orEmpty()
     var renaming by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable(project?.name) { mutableStateOf(project?.name.orEmpty()) }
     var confirm by remember { mutableStateOf<DeletionReport?>(null) }
@@ -85,9 +87,9 @@ fun taskStateKey(state: String) = "vozia.task.state_$state"
             Secondary("common.delete") { vm.phone.launch { confirm = vm.phone.library.deletionPreview(project.id) } }
         }
         // Finished tasks appear below as their saved items; only work in progress or needing attention is listed.
-        phone.tasks.filter { it.projectId == project.id && (it.active || it.state == TaskState.FAILED || it.state == TaskState.SUCCEEDED && items.none { item -> item.id == it.resultItem }) }
+        phone.tasks.filter { it.projectId == project.id && (it.active || it.state == TaskState.FAILED || loaded != null && it.state == TaskState.SUCCEEDED && items.none { item -> item.id == it.resultItem }) }
             .take(5).forEach { TaskCard(vm, it) }
-        if (items.isEmpty()) EmptyState("vozia.project.empty")
+        if (loaded == null) InlineLoading() else if (items.isEmpty()) EmptyState("vozia.project.empty")
         items.sortedWith(compareBy<LibraryItem> { it.kind != ItemKind.AUDIOBOOK }.thenBy { it.position }.thenByDescending { it.createdAt }).forEach { ItemCard(vm, it, project.name) }
     }
     if (renaming) AlertDialog(onDismissRequest = { renaming = false }, title = { Text(tr("vozia.project.rename")) },
