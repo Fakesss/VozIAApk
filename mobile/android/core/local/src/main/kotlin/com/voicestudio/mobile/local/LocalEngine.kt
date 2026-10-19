@@ -17,6 +17,9 @@ data class Transcript(val text: String, val final: Boolean, val progress: Float)
 interface LocalEngine {
     suspend fun synthesize(model: PhoneModel, text: String, speaker: Int = 0, speed: Float = 1f, language: String? = null, progress: (Float)->Unit = {}): LocalAudio
     suspend fun clone(model: PhoneModel, text: String, reference: LocalAudio, referenceText: String, progress: (Float)->Unit = {}): LocalAudio
+    /** [seconds] fixes the output length, as a dub line must fit its slot; null lets the model pace the speech. */
+    suspend fun clone(model: PhoneModel, text: String, reference: LocalAudio, referenceText: String, seconds: Double?, progress: (Float)->Unit = {}): LocalAudio =
+        clone(model,text,reference,referenceText,progress)
     suspend fun transcribe(model: PhoneModel, audio: LocalAudio, progress: (Float)->Unit = {}): String
     suspend fun transcribeSegments(model: PhoneModel, audio: LocalAudio, progress: (Float)->Unit = {}): List<SpeechSegment> {
         val text=transcribe(model,audio,progress).trim()
@@ -55,8 +58,9 @@ internal object NativeBridge {
     }}
     external fun omniAbi(): Int
     external fun llamaDevices(): Int
-    external fun cloneAudio(model: String, codec: String, text: String, referenceText: String, reference: FloatArray, control: NativeControl): FloatArray?
-    external fun translateText(model: String, prompt: String, formatted: Boolean, control: NativeControl): ByteArray?
+    /** [seconds] > 0 fixes the output length; [reserve] cores stay free for the small-model lane. */
+    external fun cloneAudio(model: String, codec: String, text: String, referenceText: String, reference: FloatArray, seconds: Float, reserve: Int, control: NativeControl): FloatArray?
+    external fun translateText(model: String, prompt: String, formatted: Boolean, reserve: Int, control: NativeControl): ByteArray?
 }
 
 /**
@@ -220,12 +224,16 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
             } finally {stream.release();recognizer.release()}
         }
     }.flowOn(Dispatchers.Default)
-    override suspend fun clone(model: PhoneModel, text: String, reference: LocalAudio, referenceText: String, progress: (Float)->Unit): LocalAudio = execute(model,"clone",progress) {dir,job ->
+    override suspend fun clone(model: PhoneModel, text: String, reference: LocalAudio, referenceText: String, progress: (Float)->Unit): LocalAudio =
+        clone(model,text,reference,referenceText,null,progress)
+    override suspend fun clone(model: PhoneModel, text: String, reference: LocalAudio, referenceText: String, seconds: Double?, progress: (Float)->Unit): LocalAudio = execute(model,"clone",progress) {dir,job ->
         require(text.isNotBlank() && text.length<=20000 && reference.sampleRate==24000 && reference.samples.size in 1..720000 && reference.samples.all {it.isFinite()} && referenceText.isNotBlank())
         NativeBridge.load()
         val codec=model.role(dir,"codec").ifEmpty {model.role(dir,"audio-tokenizer").ifEmpty {model.role(dir,"tokenizer")}}
         if(codec.isBlank()) throw ClientFailure("mobile.local.model_incompatible")
-        val result=NativeBridge.cloneAudio(model.role(dir,"model"),codec,text,referenceText,reference.samples,NativeControl(job,progress) {models.licence.accepted(model)})
+        // Below a second the model has too little room to say anything; let it pace itself.
+        val length=seconds?.takeIf {it>=1.0}?.toFloat() ?: 0f
+        val result=NativeBridge.cloneAudio(model.role(dir,"model"),codec,text,referenceText,reference.samples,length,laneReserve(),NativeControl(job,progress) {models.licence.accepted(model)})
         job.ensureActive();models.licence.requireAccepted(model)
         LocalAudio(result ?: throw ClientFailure("mobile.local.inference_failed"),24000)
     }
@@ -234,7 +242,7 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
         NativeBridge.load()
         val template=model.option("prompt_template","Translate the following text into {{target_language}}. Return only the translation.\n{{text}}")
         val prompt=template.replace("\\n","\n").replace("{{target_language}}",targetLanguage).replace("{target_language}",targetLanguage).replace("{source_language}","auto").replace("{{text}}",text).replace("{text}",text)
-        val result=NativeBridge.translateText(model.role(dir,"model"),prompt,model.option("prompt_template").contains("<|im_start|>"),NativeControl(job,progress) {models.licence.accepted(model)})
+        val result=NativeBridge.translateText(model.role(dir,"model"),prompt,model.option("prompt_template").contains("<|im_start|>"),laneReserve(),NativeControl(job,progress) {models.licence.accepted(model)})
         job.ensureActive();models.licence.requireAccepted(model)
         result?.toString(Charsets.UTF_8) ?: throw ClientFailure("mobile.local.inference_failed")
     }
@@ -242,6 +250,8 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
      * Two threads keep phones cool; big cores get up to four, never more than half.
      * While a large model runs in the other lane, two threads leave it the fast cores.
      */
+    /** Cores a large model leaves free while a small one runs in the other lane. */
+    private fun laneReserve(): Int = if(lightLease.isLocked) 2 else 0
     private fun inferenceThreads(model: PhoneModel): Int {
         val wanted=model.option("num_threads","2").toIntOrNull()?.coerceIn(1,4)?.coerceAtLeast((Runtime.getRuntime().availableProcessors()/2).coerceIn(1,4)) ?: 2
         return if(heavyLease.isLocked) minOf(wanted,2) else wanted
@@ -356,12 +366,12 @@ internal fun cpuFeatures(cpuinfo: String = runCatching {File("/proc/cpuinfo").re
 
 /**
  * Native library suffixes to try, fastest first; must match build.sh and verify.py.
- * Each ARM variant also needs what its -march implies (LSE atomics, RCpc, BF16), so
+ * Each ARM variant also needs what its -march implies (LSE atomics, RCpc and RCpc2, BF16), so
  * a CPU missing any of them keeps a slower but safe build.
  */
 internal fun cpuVariants(features: Set<String>): List<String> = buildList {
     val dotprod=listOf("asimddp","asimdhp","fphp","atomics")
-    if(features.containsAll(dotprod+listOf("lrcpc","i8mm","bf16"))) add("_i8mm")
+    if(features.containsAll(dotprod+listOf("lrcpc","ilrcpc","i8mm","bf16"))) add("_i8mm")
     if(features.containsAll(dotprod)) add("_dotprod")
     if(features.containsAll(listOf("avx","avx2","fma","f16c","bmi2"))) add("_avx2")
     add("")

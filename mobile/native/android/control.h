@@ -7,6 +7,7 @@
 #include <fstream>
 #include <thread>
 #include <vector>
+#include <sched.h>
 // JNI modified UTF-8 encodes supplementary characters differently. Convert
 // UTF-16 explicitly so model tokenizers receive standard UTF-8, including emoji.
 struct Utf8 {
@@ -69,19 +70,30 @@ struct Control {
 inline void fail(JNIEnv* e) {
     if(!e->ExceptionCheck())e->ThrowNew(e->FindClass("java/lang/IllegalStateException"),"Native inference failed");
 }
-// Cores at least half as fast as the fastest one, from the kernel's per-core
-// capacity (big.LITTLE phones); half of all cores when the kernel does not say.
+// Cores this process may run on now (Android narrows the CPU set of background
+// work) that are at least half as fast as the fastest core, from the kernel's
+// per-core capacity; half of the allowed cores when the kernel does not say.
 inline int fast_cores() {
     const int count=std::max(1,static_cast<int>(std::thread::hardware_concurrency()));
-    std::vector<long> capacity;
+    cpu_set_t set;CPU_ZERO(&set);
+    const bool masked=sched_getaffinity(0,sizeof(set),&set)==0;
+    std::vector<long> capacity(count,0);
+    long top=0;bool known=true;
     for(int i=0;i<count;++i) {
         std::ifstream file("/sys/devices/system/cpu/cpu"+std::to_string(i)+"/cpu_capacity");
-        long value=0;
-        if(file>>value&&value>0)capacity.push_back(value);
+        if(!(file>>capacity[i])||capacity[i]<=0)known=false;
+        top=std::max(top,capacity[i]);
     }
-    if(capacity.size()!=static_cast<size_t>(count))return std::max(1,count/2);
-    const long top=*std::max_element(capacity.begin(),capacity.end());
-    return static_cast<int>(std::count_if(capacity.begin(),capacity.end(),[top](long value){return value*2>=top;}));
+    int allowed=0,fast=0;
+    for(int i=0;i<count;++i) {
+        if(masked&&!CPU_ISSET(i,&set))continue;
+        ++allowed;
+        if(known&&capacity[i]*2>=top)++fast;
+    }
+    if(allowed==0)allowed=count;
+    if(!known)return std::max(1,allowed/2);
+    return fast>0?fast:allowed;
 }
-// Threads for the large models: the fast cores, leaving room for the small-model lane.
-inline int heavy_threads() {return std::clamp(fast_cores(),2,6);}
+// Threads for the large models: the fast cores, minus [reserve] left to the small-model
+// lane. ggml threads spin at barriers, so more threads than cores is much slower.
+inline int heavy_threads(int reserve) {return std::clamp(fast_cores()-std::max(0,reserve),1,6);}

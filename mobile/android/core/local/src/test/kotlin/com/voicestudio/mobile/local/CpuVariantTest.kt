@@ -23,7 +23,7 @@ class CpuVariantTest {
         // Cortex-A53: baseline only.
         assertEquals(listOf(""), cpuVariants(cpuFeatures("Features\t: fp asimd evtstrm aes crc32")))
         // A feature missing on one core rules the variant out for all.
-        assertEquals(listOf("_dotprod", ""), cpuVariants(cpuFeatures("Features\t: atomics fphp asimdhp lrcpc asimddp i8mm bf16\nFeatures\t: atomics fphp asimdhp asimddp")))
+        assertEquals(listOf("_dotprod", ""), cpuVariants(cpuFeatures("Features\t: atomics fphp asimdhp lrcpc ilrcpc asimddp i8mm bf16\nFeatures\t: atomics fphp asimdhp asimddp")))
         assertEquals(listOf("_avx2", ""), cpuVariants(cpuFeatures("flags\t\t: fpu sse4_2 avx avx2 fma f16c bmi2 popcnt")))
         assertEquals(listOf(""), cpuVariants(cpuFeatures("")))
     }

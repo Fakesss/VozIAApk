@@ -159,7 +159,9 @@ class PhoneDubPipeline(private val store: PhoneDubStore,private val engine: Loca
                     save(checkpoint.copy(segments=checkpoint.segments.toMutableList().also {it[index]=segment}))
                     text
                 }
-                val generated=engine.clone(clone,requireNotNull(segment.translations[target.code]),reference,referenceText,nativeProgress("mobile.android.stage_render",renderBase,maxOf(1,span-span/5)))
+                // The line is generated at its slot's length, which also bounds OmniVoice's work.
+                val generated=engine.clone(clone,requireNotNull(segment.translations[target.code]),reference,referenceText,frames/24000.0,
+                    nativeProgress("mobile.android.stage_render",renderBase,maxOf(1,span-span/5)))
                 val fitted=fitTiming(generated,frames)
                 val pending=File(rendered.parentFile,rendered.name+".pending")
                 writePcm(fitted,pending);currentCoroutineContext().ensureActive();authorize()

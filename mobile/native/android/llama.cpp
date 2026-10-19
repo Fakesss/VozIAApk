@@ -4,7 +4,7 @@
 #include <vector>
 #include <algorithm>
 extern "C" JNIEXPORT jint JNICALL Java_com_voicestudio_mobile_local_NativeBridge_llamaDevices(JNIEnv*,jobject) {return static_cast<jint>(llama_max_devices());}
-extern "C" JNIEXPORT jbyteArray JNICALL Java_com_voicestudio_mobile_local_NativeBridge_translateText(JNIEnv* e,jobject,jstring path,jstring prompt,jboolean preformatted,jobject control) {
+extern "C" JNIEXPORT jbyteArray JNICALL Java_com_voicestudio_mobile_local_NativeBridge_translateText(JNIEnv* e,jobject,jstring path,jstring prompt,jboolean preformatted,jint reserve,jobject control) {
     Utf8 p(e,path),t(e,prompt);Control ctl(e,control);
     llama_log_set([](ggml_log_level,const char*,void*){},nullptr);
     llama_backend_init();
@@ -12,7 +12,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_com_voicestudio_mobile_local_Native
     std::unique_ptr<llama_model,decltype(&llama_model_free)> model(llama_model_load_from_file(p.chars,mp),llama_model_free);
     if(!model){fail(e);return nullptr;}ctl.progress(.1f);
     // The prompt is compute bound and uses every fast core; token-by-token decoding is memory bound.
-    const int threads=heavy_threads();
+    const int threads=heavy_threads(reserve);
     auto cp=llama_context_default_params();cp.n_ctx=2048;cp.n_batch=256;cp.n_threads=std::min(threads,4);cp.n_threads_batch=threads;
     std::unique_ptr<llama_context,decltype(&llama_free)> context(llama_init_from_model(model.get(),cp),llama_free);
     if(!context){fail(e);return nullptr;}

@@ -92,7 +92,8 @@ suspend fun diagnosticReport(context: Context, vm: StudioViewModel, version: Str
         appendLine("Recent tasks:")
         tasks.forEach { task ->
             val model = runCatching { TaskJson.decodeFromString(SpeechInput.serializer(), task.input).choice.let { it.model + if (it.voice != null) " (cloned voice)" else "" } }.getOrNull()
-            appendLine("- ${task.kind} ${task.state} ${(task.progress * 100).toInt()}% stage=${task.stage}${model?.let { " model=$it" } ?: ""}" +
+            val result = task.resultItem?.let { if (vm.phone.library.item(it) != null) " result=present" else " result=deleted" } ?: ""
+            appendLine("- ${task.kind} ${task.state} ${(task.progress * 100).toInt()}% stage=${task.stage}${model?.let { " model=$it" } ?: ""}$result" +
                 " created=${time.format(Date(task.createdAt))} updated=${time.format(Date(task.updatedAt))}" +
                 " (${(task.updatedAt - task.createdAt) / 1000}s)${task.error?.let { " error=$it" } ?: ""}")
         }
