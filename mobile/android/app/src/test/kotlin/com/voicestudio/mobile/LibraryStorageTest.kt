@@ -76,12 +76,14 @@ class LibraryStorageTest {
         try { library.deleteProject(project.id); fail("a project with waiting tasks is protected") } catch (e: ClientFailure) { assertEquals("vozia.project.busy", e.key) }
     }
 
-    private class FakeEngine(val failAt: Int = -1) : JobEngine {
+    private class FakeEngine(val failAt: Int = -1, val midway: Boolean = false) : JobEngine {
         var calls = 0
         override fun model(id: String) = PhoneModel(id, "asr", "sherpa-onnx", files = emptyList(), totalBytes = 0, languages = listOf("pt"), minRamGb = 0.0,
             licence = ModelLicence("x", "commercial-ok", false, "", "", "0".repeat(64)), name = id)
         override suspend fun speak(choice: VoiceChoice, text: String, progress: (Float) -> Unit): LocalAudio {
             if (calls++ == failAt) throw ClientFailure("mobile.local.inference_failed")
+            // A slow engine reporting halfway through, from its own thread in the real app.
+            if (midway) { progress(.5f); kotlinx.coroutines.delay(50) }
             return LocalAudio(FloatArray(2205) { .1f }, 22050)
         }
         override suspend fun transcribe(model: PhoneModel, audio: LocalAudio, language: String?, progress: (Float) -> Unit) =
@@ -106,6 +108,24 @@ class LibraryStorageTest {
         assertTrue(library.verify(item))
         assertTrue(item.durationMs >= chunks * 100L)
         assertFalse("scratch folder removed", library.taskDirectory(task.id).exists())
+    }
+
+    @Test fun progressMovesInsideAChunkAndClonedVoicesUseShortChunks() = runBlocking<Unit> {
+        val library = library()
+        val project = library.createProject("P", ProjectKind.GENERAL)
+        val text = (1..12).joinToString(" ") { "Esta é a frase número $it de um texto para a voz clonada." }
+        val input = TaskJson.encodeToString(SpeechInput.serializer(), SpeechInput(text, "Clone", VoiceChoice("omnivoice-q4-k-m", voice = "v")))
+        val task = library.createTask(TaskKind.SPEECH, project.id, "Clone", input)
+        val engine = FakeEngine(midway = true)
+        val reported = mutableListOf<Float>()
+        LibraryJobs(library, engine).run(task) { value, _ -> reported += value }
+        val chunks = splitForSynthesis(text, LibraryJobs.CLONE_CHUNK).size
+        assertTrue("a cloned voice is split finer than ordinary speech", chunks > splitForSynthesis(text, LibraryJobs.CHUNK).size)
+        assertEquals(chunks, engine.calls)
+        // Halfway through the first chunk is reported before that chunk is done.
+        val firstHalf = .5f / chunks * .97f
+        assertTrue(reported.toString(), reported.any { kotlin.math.abs(it - firstHalf) < 1e-4 })
+        assertEquals(reported.sorted(), reported)
     }
 
     @Test fun audiobookCreatesChaptersAndAMergedBookWithChapterMarks() = runBlocking<Unit> {

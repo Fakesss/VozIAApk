@@ -11,7 +11,9 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_com_voicestudio_mobile_local_Native
     auto mp=llama_model_default_params();mp.n_gpu_layers=0;mp.progress_callback=[](float progress,void* data){auto c=static_cast<Control*>(data);c->progress(progress*.1f);return !Control::cancelled(data);};mp.progress_callback_user_data=&ctl;
     std::unique_ptr<llama_model,decltype(&llama_model_free)> model(llama_model_load_from_file(p.chars,mp),llama_model_free);
     if(!model){fail(e);return nullptr;}ctl.progress(.1f);
-    auto cp=llama_context_default_params();cp.n_ctx=2048;cp.n_batch=256;cp.n_threads=2;cp.n_threads_batch=2;
+    // The prompt is compute bound and uses every fast core; token-by-token decoding is memory bound.
+    const int threads=heavy_threads();
+    auto cp=llama_context_default_params();cp.n_ctx=2048;cp.n_batch=256;cp.n_threads=std::min(threads,4);cp.n_threads_batch=threads;
     std::unique_ptr<llama_context,decltype(&llama_free)> context(llama_init_from_model(model.get(),cp),llama_free);
     if(!context){fail(e);return nullptr;}
     llama_set_abort_callback(context.get(),Control::cancelled,&ctl);

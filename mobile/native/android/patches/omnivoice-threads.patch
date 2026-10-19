@@ -1,0 +1,34 @@
+diff -ru a/src/backend.h b/src/backend.h
+--- a/src/backend.h
++++ b/src/backend.h
+@@ -24,10 +24,17 @@
+ static BackendPair g_backend_cache = {};
+ static int         g_backend_refs  = 0;
+ 
++// VoiceStudio Android: thread count chosen by the app (its fast cores) through
++// ov_vozia_set_threads; 0 keeps the heuristic below.
++static int ov_vozia_n_threads = 0;
++
+ // Physical core count heuristic (logical / 2 for HT/SMT).
+ // Used for GGML CPU thread count: GEMM shares SIMD units across hyperthreads,
+ // so one thread per physical core is optimal.
+ static int backend_cpu_n_threads(void) {
++    if (ov_vozia_n_threads > 0) {
++        return ov_vozia_n_threads;
++    }
+     int n = (int) std::thread::hardware_concurrency() / 2;
+     return n > 0 ? n : 1;
+ }
+diff -ru a/src/omnivoice.cpp b/src/omnivoice.cpp
+--- a/src/omnivoice.cpp
++++ b/src/omnivoice.cpp
+@@ -338,3 +338,9 @@
+ }
+ 
+ }  // extern "C"
++
++// VoiceStudio Android: CPU threads for the next ov_init (0 restores the default).
++// backend_init runs only in this translation unit, so this is the copy it reads.
++extern "C" void ov_vozia_set_threads(int n_threads) {
++    ov_vozia_n_threads = n_threads > 0 ? n_threads : 0;
++}

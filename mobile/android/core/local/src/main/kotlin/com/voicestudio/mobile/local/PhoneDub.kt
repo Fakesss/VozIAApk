@@ -131,10 +131,13 @@ class PhoneDubPipeline(private val store: PhoneDubStore,private val engine: Loca
             for(index in checkpoint.segments.indices) {
                 currentCoroutineContext().ensureActive();authorize()
                 val base=targetPercent(index.toDouble()/checkpoint.segments.size*.85)
+                // Each segment owns its share of the bar: a fifth for translation, the rest for the voice.
+                val span=maxOf(1,targetPercent((index+1.0)/checkpoint.segments.size*.85)-base)
+                val renderBase=base+span/5
                 var segment=checkpoint.segments[index]
                 if(segment.translations[target.code].isNullOrBlank()) {
                     stage("mobile.android.stage_translate",base)
-                    val translated=engine.translate(translator,segment.speech.text,target.name,nativeProgress("mobile.android.stage_translate",base,1)).trim()
+                    val translated=engine.translate(translator,segment.speech.text,target.name,nativeProgress("mobile.android.stage_translate",base,maxOf(1,span/5))).trim()
                     if(translated.isBlank()) throw ClientFailure("mobile.android.translation_failed")
                     segment=segment.copy(translations=segment.translations+(target.code to translated))
                     save(checkpoint.copy(segments=checkpoint.segments.toMutableList().also {it[index]=segment}))
@@ -145,7 +148,7 @@ class PhoneDubPipeline(private val store: PhoneDubStore,private val engine: Loca
                 val rendered=store.file(id,"render-$targetIndex-$index.pcm")
                 val previous=checkpoint.renders.firstOrNull {it.index==index}
                 if(previous!=null&&previous.frames==frames.toLong()&&rendered.length()==frames*4L&&sha256(rendered)==previous.sha256) continue
-                stage("mobile.android.stage_render",base)
+                stage("mobile.android.stage_render",renderBase)
                 val reference=if(request.referenceText!=null) {
                     val saved=PcmFile(store.file(id,"voice-reference.pcm"));saved.read(0,saved.frames.toInt())
                 } else pcm.clip(segment.speech.start,minOf(segment.speech.end,segment.speech.start+8.0))
@@ -156,7 +159,7 @@ class PhoneDubPipeline(private val store: PhoneDubStore,private val engine: Loca
                     save(checkpoint.copy(segments=checkpoint.segments.toMutableList().also {it[index]=segment}))
                     text
                 }
-                val generated=engine.clone(clone,requireNotNull(segment.translations[target.code]),reference,referenceText,nativeProgress("mobile.android.stage_render",base,1))
+                val generated=engine.clone(clone,requireNotNull(segment.translations[target.code]),reference,referenceText,nativeProgress("mobile.android.stage_render",renderBase,maxOf(1,span-span/5)))
                 val fitted=fitTiming(generated,frames)
                 val pending=File(rendered.parentFile,rendered.name+".pending")
                 writePcm(fitted,pending);currentCoroutineContext().ensureActive();authorize()

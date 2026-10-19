@@ -19,6 +19,8 @@ import org.robolectric.annotation.Config
 @Config(sdk=[34])
 class PhoneDubWorkerTest {
     private val context get()=ApplicationProvider.getApplicationContext<Context>()
+    // The notification's Cancel action needs WorkManager; without this the test depended on another class initialising it first.
+    @Before fun workManager() {androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(context)}
     @Test fun foregroundIsRequiredAndCancellationPropagatesWithoutNetwork()=runBlocking {
         var promoted=false
         val worker=TestListenableWorkerBuilder<PhoneDubWorker>(context).setInputData(workDataOf("job" to java.util.UUID.randomUUID().toString()))

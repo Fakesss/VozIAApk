@@ -2,8 +2,11 @@ package com.voicestudio.mobile.data.library
 
 import com.voicestudio.mobile.local.*
 import com.voicestudio.mobile.network.ClientFailure
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -183,7 +186,9 @@ class LibraryJobs(private val library: Library, private val engine: JobEngine) {
 
     /** Synthesizes [text] in sentence-aligned chunks, reusing chunk checkpoints already on disk. */
     private suspend fun synthesizeText(text: String, choice: VoiceChoice, directory: File, progress: suspend (Float) -> Unit): Rendered {
-        val chunks = splitForSynthesis(text, CHUNK)
+        // Cloned voices run OmniVoice, which is slow on phones: shorter chunks keep
+        // progress moving and make each checkpoint cheaper to redo after a stop.
+        val chunks = splitForSynthesis(text, if (choice.voice != null) CLONE_CHUNK else CHUNK)
         if (chunks.isEmpty()) throw ClientFailure("vozia.task.empty_text")
         directory.mkdirs()
         val identity = File(directory, "choice.json")
@@ -196,7 +201,12 @@ class LibraryJobs(private val library: Library, private val engine: JobEngine) {
             val file = File(directory, "chunk-%05d.pcm".format(index))
             val rateFile = File(directory, "chunk-%05d.rate".format(index))
             if (!file.exists() || !rateFile.exists()) {
-                val audio = engine.speak(choice, chunk) {}
+                val audio = coroutineScope {
+                    // The engine reports from its own thread; the latest value is forwarded here.
+                    val live = MutableStateFlow(0f)
+                    val reporter = launch { live.collect { progress((index + it) / chunks.size) } }
+                    try { engine.speak(choice, chunk) { live.value = it.coerceIn(0f, 1f) } } finally { reporter.cancel() }
+                }
                 if (audio.samples.isEmpty()) throw ClientFailure("mobile.local.inference_failed")
                 writePcmAtomic(audio, file)
                 atomicWrite(rateFile, audio.sampleRate.toString())
@@ -224,6 +234,7 @@ class LibraryJobs(private val library: Library, private val engine: JobEngine) {
 
     companion object {
         const val CHUNK = 900
+        const val CLONE_CHUNK = 300
         const val GAP = .12
         internal fun atomicWrite(file: File, text: String) {
             val pending = File(file.path + ".pending")

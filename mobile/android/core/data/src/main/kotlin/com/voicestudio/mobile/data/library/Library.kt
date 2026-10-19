@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -58,11 +59,12 @@ class Library(context: Context, databaseName: String? = "library.db", val root: 
         })
         changed(); project
     }
-    /** The default destination for Speak, created on first use and kept forever. */
-    suspend fun defaultProject(name: String): Project = io {
+    private val defaultLock = kotlinx.coroutines.sync.Mutex()
+    /** The default destination for Speak, created on first use and kept forever; two quick taps still create only one. */
+    suspend fun defaultProject(name: String): Project = io { defaultLock.withLock {
         val existing = setting("default_project")?.let { id -> read.query("projects", null, "id=?", arrayOf(id), null, null, null).all { project() }.firstOrNull() }
         existing ?: createProject(name, ProjectKind.GENERAL).also { putSetting("default_project", it.id) }
-    }
+    } }
     suspend fun renameProject(id: String, name: String) = io {
         val clean = name.trim().take(120).ifEmpty { throw ClientFailure("vozia.project.name_required") }
         write.update("projects", ContentValues().apply { put("name", clean); put("updated_at", System.currentTimeMillis()) }, "id=?", arrayOf(id)); changed()

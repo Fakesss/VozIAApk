@@ -46,11 +46,18 @@ class VoiceStudioApplication:Application() {
         }
     }
 }
+/** A screen a notification asked to open; StudioApp navigates there once its graph is ready. */
+internal val launchRoute=kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 class MainActivity:ComponentActivity() {
     override fun onCreate(savedInstanceState:Bundle?) {
         setTheme(R.style.AppTheme)
         super.onCreate(savedInstanceState);enableEdgeToEdge()
+        if(savedInstanceState==null) takeRoute(intent)
         setContent {StudioApp()}
+    }
+    override fun onNewIntent(intent: android.content.Intent) {super.onNewIntent(intent);takeRoute(intent)}
+    private fun takeRoute(intent: android.content.Intent?) {
+        intent?.getStringExtra(com.voicestudio.mobile.data.library.LibraryWorker.ROUTE_EXTRA)?.takeIf {it in setOf("tasks","dub")}?.let {launchRoute.value=it}
     }
 }
 
@@ -117,7 +124,10 @@ class MainActivity:ComponentActivity() {
                     if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                     Box(Modifier.weight(1f)) {
                     if(state.loading) Screen {Text(tr("common.loading"));LinearProgressIndicator()}
-                    else NavHost(navController=nav,startDestination=initialRoute,
+                    else {
+                    val pending by launchRoute.collectAsState()
+                    LaunchedEffect(pending) {pending?.let {launchRoute.value=null;nav.navigate(it) {launchSingleTop=true}}}
+                    NavHost(navController=nav,startDestination=initialRoute,
                         enterTransition={androidx.compose.animation.EnterTransition.None}, exitTransition={androidx.compose.animation.ExitTransition.None},
                         popEnterTransition={androidx.compose.animation.EnterTransition.None}, popExitTransition={androidx.compose.animation.ExitTransition.None}) {
                         composable("connect") {ConnectScreen(vm)}
@@ -125,7 +135,7 @@ class MainActivity:ComponentActivity() {
                         composable("library") {com.voicestudio.mobile.features.library.LibraryScreen(vm) {nav.navigate("library/${it.id}")}}
                         composable("library/{id}") {entry -> com.voicestudio.mobile.features.library.ProjectScreen(vm,entry.arguments?.getString("id").orEmpty(),deleted={nav.popBackStack()},
                             openAudiobook={nav.navigate("audiobook/$it")},openTranscription={nav.navigate("transcribe/$it")})}
-                        composable("tasks") {com.voicestudio.mobile.features.library.TasksScreen(vm)}
+                        composable("tasks") {com.voicestudio.mobile.features.library.TasksScreen(vm) {nav.navigate("library/$it")}}
                         composable("audiobooks") {com.voicestudio.mobile.features.library.AudiobooksScreen(vm) {nav.navigate("audiobook/$it")}}
                         composable("audiobook/{id}") {entry -> com.voicestudio.mobile.features.library.AudiobookScreen(vm,entry.arguments?.getString("id").orEmpty()) {nav.navigate("library/$it")}}
                         composable("transcribe") {com.voicestudio.mobile.features.library.TranscribeScreen(vm,null) {nav.navigate("transcribe/$it")}}
@@ -141,6 +151,7 @@ class MainActivity:ComponentActivity() {
                         composable("voices") {VoicesScreen(vm)}
                         composable("dub") {DubScreen(vm)}
                         composable("dictate") {DictateScreen(vm)}
+                    }
                     }
                     }
                     }

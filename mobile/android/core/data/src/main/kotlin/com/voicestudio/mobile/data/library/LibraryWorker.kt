@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.work.*
 import com.voicestudio.mobile.data.SessionStore
 import com.voicestudio.mobile.l10n.L10n
+import com.voicestudio.mobile.local.EngineWait
 import com.voicestudio.mobile.local.PhoneRuntime
 import com.voicestudio.mobile.local.PhoneVoiceStore
 import com.voicestudio.mobile.network.ClientFailure
@@ -43,8 +44,10 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val l = l10n()
         applicationContext.getSystemService(NotificationManager::class.java)
             .createNotificationChannel(NotificationChannel(CHANNEL, l.t("vozia.task.channel"), NotificationManager.IMPORTANCE_LOW))
+        // Tapping the notification opens Tasks.
         val launch = applicationContext.packageManager.getLaunchIntentForPackage(applicationContext.packageName)
-        val intent = launch?.let { PendingIntent.getActivity(applicationContext, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
+            ?.putExtra(ROUTE_EXTRA, "tasks")?.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val intent = launch?.let { PendingIntent.getActivity(applicationContext, 1, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
         val text = l.t(if (failed) "vozia.task.failed" else if (finished) "vozia.task.done" else stage)
         val builder = NotificationCompat.Builder(applicationContext, CHANNEL).setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(title.ifEmpty { l.t("vozia.task.channel") }).setContentText(text).setContentIntent(intent)
@@ -55,6 +58,8 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         return ForegroundInfo(id.hashCode(), builder.build(), type)
     }
     override suspend fun getForegroundInfo(): ForegroundInfo = notification()
+    /** Android may refuse foreground promotion (background start limits); the work still runs. */
+    private suspend fun promote() { try { setForeground(notification()) } catch (e: CancellationException) { throw e } catch (_: Exception) {} }
 
     override suspend fun doWork(): Result {
         val taskId = inputData.getString(KEY_TASK) ?: return Result.failure()
@@ -62,29 +67,50 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val task = library.task(taskId) ?: return Result.failure()
         if (!task.active) return Result.success()
         title = task.title
-        // Android may refuse foreground promotion (background start limits); the work still runs.
-        runCatching { setForeground(notification()) }
+        // Each start counts, including restarts after the process died; a task that keeps
+        // killing the app (a native crash, memory) fails with a message instead of looping.
+        if (runAttemptCount >= MAX_ATTEMPTS) {
+            library.updateTask(taskId, state = TaskState.FAILED, stage = "vozia.task.failed", error = "vozia.task.too_many_attempts")
+            notifyFinished(failed = true)
+            return Result.failure(workDataOf(KEY_TASK to taskId, "error" to "vozia.task.too_many_attempts"))
+        }
+        promote()
         library.updateTask(taskId, state = TaskState.RUNNING, stage = "vozia.task.running", clearError = true)
         val runtime = PhoneRuntime.get(applicationContext)
         val jobs = LibraryJobs(library, RuntimeJobEngine(runtime, PhoneVoiceStore(File(applicationContext.noBackupFilesDir, "voices"))))
         var lastReport = 0L
+        // While another job holds the model lane, the task says so instead of sitting at its last stage.
+        val wait = EngineWait { waiting ->
+            val key = if (waiting) "vozia.task.waiting_engine" else stage
+            library.updateTask(taskId, stage = key)
+            val shown = stage; stage = key
+            promote()
+            stage = shown
+        }
         return try {
-            val result = jobs.run(task) { value, key ->
+            val result = withContext(wait) { jobs.run(task) { value, key ->
                 progress = value; stage = key
                 val now = System.currentTimeMillis()
                 if (now - lastReport > 700 || value >= 1f) {
                     lastReport = now
                     library.updateTask(taskId, progress = value, stage = key)
                     setProgress(workDataOf("progress" to value, "stage" to key))
-                    runCatching { setForeground(notification()) }
+                    promote()
                 }
-            }
+            } }
             library.updateTask(taskId, state = TaskState.SUCCEEDED, progress = 1f, stage = "vozia.task.done", resultItem = result.itemId)
             notifyFinished(failed = false)
             Result.success(workDataOf(KEY_TASK to taskId))
         } catch (e: CancellationException) {
             withContext(NonCancellable) {
-                if (library.task(taskId)?.state != TaskState.CANCELLED) library.updateTask(taskId, state = TaskState.QUEUED, stage = "vozia.task.interrupted")
+                // The notification's Cancel action stops the work directly; record it as a cancel, not a pause.
+                val reason = if (Build.VERSION.SDK_INT >= 31) stopReason else WorkInfo.STOP_REASON_NOT_STOPPED
+                when {
+                    library.task(taskId)?.state == TaskState.CANCELLED -> {}
+                    reason == WorkInfo.STOP_REASON_CANCELLED_BY_APP -> library.updateTask(taskId, state = TaskState.CANCELLED, stage = "vozia.task.cancelled")
+                    reason == WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT -> library.updateTask(taskId, state = TaskState.QUEUED, stage = "vozia.task.paused_by_android")
+                    else -> library.updateTask(taskId, state = TaskState.QUEUED, stage = "vozia.task.interrupted")
+                }
             }
             throw e
         } catch (e: Exception) {
@@ -107,7 +133,10 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     companion object {
         const val TAG = "voicestudio.library"
         const val KEY_TASK = "task"
+        /** Launch-intent extra naming the screen to open (MainActivity reads it). */
+        const val ROUTE_EXTRA = "vozia.route"
         private const val CHANNEL = "library-tasks"
+        private const val MAX_ATTEMPTS = 6
         private fun unique(taskId: String) = "library:$taskId"
 
         /** One task runs at a time; native inference is serialized anyway and this bounds memory. */
@@ -127,6 +156,10 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         /** After process start: finish interrupted writes and re-enqueue every waiting task. */
         suspend fun resumeAll(context: Context, library: Library) {
             library.recover()
+            resumeQueued(context, library)
+        }
+        /** Gives every waiting task a work request again; tasks that still have one keep it. */
+        suspend fun resumeQueued(context: Context, library: Library) {
             library.tasks().filter { it.state == TaskState.QUEUED }.forEach { enqueue(context, it.id) }
         }
     }

@@ -30,7 +30,8 @@ class PhoneDubWorker(context: Context,params: WorkerParameters): CoroutineWorker
         val l=L10n.load(applicationContext,prefs.locale.takeUnless {it=="system"} ?: java.util.Locale.getDefault().toLanguageTag())
         applicationContext.getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL,l.t("mobile.tabs.dub"),NotificationManager.IMPORTANCE_LOW))
         val launch=applicationContext.packageManager.getLaunchIntentForPackage(applicationContext.packageName)
-        val intent=launch?.let {PendingIntent.getActivity(applicationContext,0,it,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)}
+            ?.putExtra(com.voicestudio.mobile.data.library.LibraryWorker.ROUTE_EXTRA,"dub")?.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val intent=launch?.let {PendingIntent.getActivity(applicationContext,2,it,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)}
         val notification=NotificationCompat.Builder(applicationContext,CHANNEL).setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle(l.t("mobile.tabs.dub")).setContentText(l.t(if(finished) "mobile.android.stage_done" else progress.stage))
             .setContentIntent(intent).setOngoing(!finished).setAutoCancel(finished)
@@ -40,10 +41,12 @@ class PhoneDubWorker(context: Context,params: WorkerParameters): CoroutineWorker
         return ForegroundInfo(id.hashCode(),notification.build(),type)
     }
     override suspend fun getForegroundInfo(): ForegroundInfo = notification()
+    /** Android may refuse foreground promotion when the work restarts in the background; the dub still runs. */
+    private suspend fun promote() {try {setForeground(notification())} catch(e:CancellationException) {throw e} catch(_:Exception) {}}
     override suspend fun doWork(): Result {
         val job=inputData.getString("job") ?: return Result.failure()
         try {
-            setForeground(notification())
+            promote()
             val runtime=PhoneRuntime.get(applicationContext)
             val request=jobs.request(job)
             val catalog=withContext(Dispatchers.IO) {applicationContext.assets.open("models.json").bufferedReader().use {ModelCatalog.decode(it.readText())}}
@@ -59,10 +62,13 @@ class PhoneDubWorker(context: Context,params: WorkerParameters): CoroutineWorker
                     for(value in updates) {
                         progress=value
                         setProgress(workDataOf("stage" to value.stage,"percent" to value.percent,"job" to job))
-                        setForeground(notification())
+                        promote()
                     }
                 }
-                try {PhoneDubPipeline(jobs,runtime.engine,authorize=authorize).run(job,models) {updates.trySend(it)}}
+                var last=progress
+                // Shows when the dub waits for another job's model instead of looking frozen.
+                val wait=EngineWait {waiting ->updates.trySend(if(waiting) last.copy(stage="mobile.android.stage_waiting") else last)}
+                try {withContext(wait) {PhoneDubPipeline(jobs,runtime.engine,authorize=authorize).run(job,models) {last=it;updates.trySend(it)}}}
                 finally {updates.close()}
                 reporter.join()
             }

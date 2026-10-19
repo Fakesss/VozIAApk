@@ -146,7 +146,7 @@ tasks.withType<Test>().configureEach {
 val buildNativeRuntimes by tasks.registering(Exec::class) {
     dependsOn(":core:local:fetchRuntimes")
     val nativeRoot = rootDir.resolve("../native/android")
-    inputs.files(fileTree(nativeRoot) { include("*.cpp", "*.h", "*.json", "*.py", "*.sh", "CMakeLists.txt") }, nativeRoot.resolve("../pins.json"))
+    inputs.files(fileTree(nativeRoot) { include("*.cpp", "*.h", "*.json", "*.py", "*.sh", "CMakeLists.txt", "patches/*.patch") }, nativeRoot.resolve("../pins.json"))
     inputs.files(fileTree("src/main/assets/licenses") { include("native-*") })
     outputs.dir(nativeRoot.resolve("build/jniLibs"))
     outputs.dir(nativeRoot.resolve("build/assets"))

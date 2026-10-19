@@ -49,9 +49,11 @@ import java.io.File
     val recorder=remember {SampleRecorder(context)}
     LaunchedEffect(Unit) {sample?.let {if(!File(it).exists()) sample=null}}
     DisposableEffect(lifecycle) {
-        val observer=LifecycleEventObserver {_,event -> if(event==Lifecycle.Event.ON_STOP) {vm.phone.cancelInference();if(recording) {recorder.discard();recording=false;sample=null}}}
+        // A recording stops with the screen; a voice already being created finishes in the background
+        // (it only transcribes the sample) and deletes the sample itself.
+        val observer=LifecycleEventObserver {_,event -> if(event==Lifecycle.Event.ON_STOP) {if(recording) {recorder.discard();recording=false;sample=null}}}
         lifecycle.lifecycle.addObserver(observer)
-        onDispose {lifecycle.lifecycle.removeObserver(observer);if(recording) recorder.discard();sample?.let {File(it).delete()};sample=null;vm.phone.cancelInference()}
+        onDispose {lifecycle.lifecycle.removeObserver(observer);if(recording) recorder.discard();if(vm.phone.state.value.cloneProgress==null) sample?.let {File(it).delete()};sample=null}
     }
     LaunchedEffect(recording) {seconds=0;while(recording) {
         delay(1000);seconds++
@@ -65,7 +67,7 @@ import java.io.File
     }
     Screen {
         ScreenTitle("mobile.tabs.voices")
-        if(!cloning) Action("mobile.voices.new_clone",!state.busy&&phone.progress==null) {cloning=true}
+        if(!cloning) Action("mobile.voices.new_clone",!state.busy&&phone.cloneProgress==null) {cloning=true}
         if(cloning) {
         if(location!=RunLocation.COMPUTER) {
             if(model!=null&&!phone.canRun(model,vm.phone.ramBytes)) MissingModelsCard(vm,"mobile.tabs.voices",listOf(model))
@@ -81,7 +83,7 @@ import java.io.File
             Secondary("common.stop") {try {sample=recorder.stop().absolutePath;recording=false} catch(e:Exception) {recording=false;sample=null;vm.fail(e)}}
         } else Secondary("mobile.voices.record",onClick=record)
         if(sample!=null&&!recording) Text(tr("mobile.android.sample_ready"))
-        Action("mobile.voices.new_clone",permission&&sample!=null&&name.isNotBlank()&&!state.busy&&!recording&&phone.progress==null&&(location==RunLocation.COMPUTER||(model!=null&&phone.canRun(model,vm.phone.ramBytes)))) {
+        Action("mobile.voices.new_clone",permission&&sample!=null&&name.isNotBlank()&&!state.busy&&!recording&&phone.cloneProgress==null&&(location==RunLocation.COMPUTER||(model!=null&&phone.canRun(model,vm.phone.ramBytes)))) {
             if(location==RunLocation.COMPUTER) {vm.clone(name,File(sample!!));sample=null;name="";permission=false;cloning=false}
             else vm.phone.clone(name,File(sample!!),model!!,permission) {sample=null;name="";permission=false;cloning=false}
         }
@@ -91,7 +93,11 @@ import java.io.File
             Box(Modifier.weight(1f)) {Field("mobile.voices.search",query,{query=it})}
             IconAction("common.refresh",Icons.Default.Refresh,!state.busy,onClick=vm::refresh)
         }
-        phone.progress?.let {p -> LinearProgressIndicator(progress={p},modifier=Modifier.fillMaxWidth());Secondary("common.cancel") {vm.phone.cancelInference()}}
+        phone.cloneProgress?.let {p ->
+            LinearProgressIndicator(progress={p},modifier=Modifier.fillMaxWidth())
+            if(phone.cloneWaiting) Text(tr("vozia.task.waiting_engine"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
+            Secondary("common.cancel") {vm.phone.cancelInference()}
+        }
         val matches=profiles.filter {it.name.contains(query,true)}
         if(query.isNotBlank() && matches.isEmpty()) SearchEmpty(query)
         else if(state.catalogLoading) InlineLoading()

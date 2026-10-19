@@ -31,6 +31,7 @@ import com.voicestudio.mobile.l10n.L10n
         SettingsLink("vozia.library.title",onClick=onLibrary)
         SettingsLink("vozia.task.title",onClick=onTasks)
         StorageSettings(vm)
+        PerformanceSettings(vm,version)
         if(state.connected) {
             Heading("mobile.settings.connection")
             SettingsLink("mobile.settings.connection",prefs.activeUrl.orEmpty(),onConnect)

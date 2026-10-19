@@ -5,7 +5,6 @@ import com.voicestudio.mobile.network.ClientFailure
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
@@ -37,24 +36,67 @@ class NativeControl(private val job: Job, private val report: (Float)->Unit, pri
 }
 @androidx.annotation.Keep
 internal object NativeBridge {
-    fun load() {System.loadLibrary("vs_omni");System.loadLibrary("vs_llama")}
+    /** The CPU variant loaded ("" is the baseline build), null before [load]. */
+    @Volatile var variant: String?=null
+        private set
+    /**
+     * Loads the fastest build of each runtime this CPU supports (see build.sh). A
+     * variant missing from the APK for this ABI is skipped; one built for features
+     * the CPU lacks is never tried, since it would crash with an illegal instruction.
+     */
+    fun load() {synchronized(this) {
+        if(variant!=null) return
+        val candidates=cpuVariants(cpuFeatures())
+        val loaded=listOf("vs_omni","vs_llama").map {runtime ->
+            candidates.dropLast(1).firstOrNull {suffix -> runCatching {System.loadLibrary(runtime+suffix)}.isSuccess}
+                ?: "".also {System.loadLibrary(runtime)}
+        }
+        variant=loaded.first()
+    }}
     external fun omniAbi(): Int
     external fun llamaDevices(): Int
     external fun cloneAudio(model: String, codec: String, text: String, referenceText: String, reference: FloatArray, control: NativeControl): FloatArray?
     external fun translateText(model: String, prompt: String, formatted: Boolean, control: NativeControl): ByteArray?
 }
 
+/**
+ * Lets a caller show that its job waits for another job's model: [waiting] gets
+ * true while the lane is busy and false once this job holds it.
+ */
+class EngineWait(val waiting: suspend (Boolean)->Unit): kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+    companion object Key: kotlin.coroutines.CoroutineContext.Key<EngineWait>
+}
+
 class PhoneLocalEngine(private val models: ModelDownloads, private val system: SystemSpeech? = null): LocalEngine {
-    companion object {private val nativeLease=Mutex()}
+    companion object {
+        // One large GGUF model (OmniVoice, llama.cpp) and one small ONNX model run at a
+        // time: a slow clone or dub no longer holds up ordinary speech or transcription,
+        // and memory stays bounded to one model of each kind.
+        private val heavyLease=Mutex()
+        private val lightLease=Mutex()
+        internal fun lease(model: PhoneModel): Mutex = if(model.capability in setOf("clone","translate")) heavyLease else lightLease
+    }
     internal suspend fun <T> execute(model: PhoneModel, capability: String, progress: (Float)->Unit, block: suspend (File,Job)->T): T =
         withContext(Dispatchers.Default) {
             if(model.capability != capability) throw ClientFailure("mobile.local.model_incompatible")
             try {
-                nativeLease.withLock {models.withModel(model) { directory ->
-                    currentCoroutineContext().ensureActive();progress(0f)
-                    val result=block(directory,currentCoroutineContext().job)
-                    currentCoroutineContext().ensureActive();models.licence.requireAccepted(model);progress(1f);result
-                }}
+                // Fail before queueing for a lane: a missing model or withdrawn licence must not wait behind other jobs.
+                models.licence.requireAccepted(model)
+                if(!models.installed(model)) throw ClientFailure("mobile.local.model_required")
+                val lease=lease(model)
+                val wait=currentCoroutineContext()[EngineWait]
+                if(!lease.tryLock()) {
+                    runCatching {wait?.waiting?.invoke(true)}
+                    lease.lock()
+                }
+                try {
+                    runCatching {wait?.waiting?.invoke(false)}
+                    models.withModel(model) { directory ->
+                        currentCoroutineContext().ensureActive();progress(0f)
+                        val result=block(directory,currentCoroutineContext().job)
+                        currentCoroutineContext().ensureActive();models.licence.requireAccepted(model);progress(1f);result
+                    }
+                } finally {lease.unlock()}
             } catch(e:CancellationException) {throw e}
             catch(e:ClientFailure) {throw e}
             catch(e:LinkageError) {throw ClientFailure("mobile.local.runtime_failed")}
@@ -180,9 +222,14 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
         job.ensureActive();models.licence.requireAccepted(model)
         result?.toString(Charsets.UTF_8) ?: throw ClientFailure("mobile.local.inference_failed")
     }
-    /** Two threads keep phones cool; big cores get up to four, never more than half. */
-    private fun inferenceThreads(model: PhoneModel): Int =
-        model.option("num_threads","2").toIntOrNull()?.coerceIn(1,4)?.coerceAtLeast((Runtime.getRuntime().availableProcessors()/2).coerceIn(1,4)) ?: 2
+    /**
+     * Two threads keep phones cool; big cores get up to four, never more than half.
+     * While a large model runs in the other lane, two threads leave it the fast cores.
+     */
+    private fun inferenceThreads(model: PhoneModel): Int {
+        val wanted=model.option("num_threads","2").toIntOrNull()?.coerceIn(1,4)?.coerceAtLeast((Runtime.getRuntime().availableProcessors()/2).coerceIn(1,4)) ?: 2
+        return if(heavyLease.isLocked) minOf(wanted,2) else wanted
+    }
     private fun dataDirectory(model: PhoneModel, directory: File): String {
         val path=model.option("data_dir").ifEmpty {model.files.firstOrNull {"espeak-ng-data/" in it.path}?.path?.substringBefore("espeak-ng-data/")?.plus("espeak-ng-data").orEmpty()}
         if(path.isBlank()) return ""
@@ -232,6 +279,23 @@ fun markSynthetic(audio: LocalAudio, file: File) {
     tag("LIST");buffer.putInt(4+8+padded);tag("INFO");tag("ICMT");buffer.putInt(marker.size);buffer.put(marker);if(marker.size%2!=0) buffer.put(0)
     file.parentFile!!.mkdirs();FileOutputStream(file).use {it.write(buffer.array());it.fd.sync()}
 }
+
+/** CPU feature flags every core reports (ARM "Features", x86 "flags" in /proc/cpuinfo). */
+internal fun cpuFeatures(cpuinfo: String = runCatching {File("/proc/cpuinfo").readText()}.getOrDefault("")): Set<String> =
+    cpuinfo.lineSequence().filter {it.startsWith("Features")||it.startsWith("flags")}
+        .map {it.substringAfter(':').trim().split(Regex("\\s+")).toSet()}
+        .reduceOrNull {all,next -> all intersect next}.orEmpty()
+
+/** Native library suffixes to try, fastest first; must match build.sh and verify.py. */
+internal fun cpuVariants(features: Set<String>): List<String> = buildList {
+    if(features.containsAll(listOf("asimddp","asimdhp","i8mm"))) add("_i8mm")
+    if(features.containsAll(listOf("asimddp","asimdhp"))) add("_dotprod")
+    if(features.containsAll(listOf("avx","avx2","fma","f16c","bmi2"))) add("_avx2")
+    add("")
+}
+
+/** The CPU build of OmniVoice/llama.cpp in use, or the one that will load: "i8mm", "dotprod", "avx2" or "baseline". */
+fun nativeCpuVariant(): String = (NativeBridge.variant ?: cpuVariants(cpuFeatures()).first()).removePrefix("_").ifEmpty {"baseline"}
 
 /** Model-free device test: all native dependencies must resolve on ART. */
 suspend fun verifyNativeRuntimes(): Map<String,Int> = withContext(Dispatchers.IO) {

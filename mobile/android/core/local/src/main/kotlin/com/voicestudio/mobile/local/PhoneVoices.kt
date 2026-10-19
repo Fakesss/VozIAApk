@@ -21,6 +21,7 @@ internal fun atomicText(file: File, text: String) {
 @Serializable data class PhoneVoice(val id: String, val name: String, val transcript: String, val createdAt: Long, val consentAt: Long, val sampleRate: Int = 24000)
 /** One atomic metadata publication after ASR + reference writes. No user paths. */
 class PhoneVoiceStore(private val root: File) {
+    companion object {const val REFERENCE_SECONDS=12}
     private val mutex=Mutex()
     private fun directory(id: String): File {
         require(runCatching {UUID.fromString(id).toString()==id}.getOrDefault(false))
@@ -45,10 +46,16 @@ class PhoneVoiceStore(private val root: File) {
         val id=UUID.randomUUID().toString()
         val dir=directory(id).apply {mkdirs()}
         try {
-            val audio=decoder.decode(source,File(dir,"reference.pcm"),30) {progress(it*.25f)}
-            val transcript=engine.transcribe(asr,audio.read(0,audio.frames.toInt())) {progress(.25f+it*.7f)}.trim()
+            val decoded=decoder.decode(source,File(dir,"reference.pcm"),30) {progress(it*.25f)}
+            // OmniVoice re-reads the whole reference for every sentence it speaks, so a long
+            // sample makes each one slower. Keep the first ~12 s, cut at a pause, and
+            // transcribe exactly that part so text and audio still match.
+            val full=decoded.read(0,decoded.frames.toInt())
+            val end=speechWindows(full.samples,full.sampleRate,REFERENCE_SECONDS,3).first().second
+            val reference=if(end<full.samples.size) LocalAudio(full.samples.copyOf(end),full.sampleRate).also {writePcm(it,File(dir,"reference.pcm"))} else full
+            val transcript=engine.transcribe(asr,reference) {progress(.25f+it*.7f)}.trim()
             if(transcript.isEmpty()) throw ClientFailure("mobile.simple.no_speech")
-            writeReferenceWave(audio.read(0,audio.frames.toInt()),File(dir,"reference.wav"))
+            writeReferenceWave(reference,File(dir,"reference.wav"))
             currentCoroutineContext().ensureActive()
             val now=System.currentTimeMillis()
             val voice=PhoneVoice(id,name.trim(),transcript,now,now)

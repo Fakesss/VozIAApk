@@ -32,11 +32,22 @@ if [[ $FULL == heavy ]]; then
     log "## Heavy models · $(adb shell getprop ro.product.model | tr -d '\r') · API $(adb shell getprop ro.build.version.sdk | tr -d '\r') · RAM $(adb shell cat /proc/meminfo | head -1 | tr -s ' ' | tr -d '\r')"
     adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; adb install -r "$DIST/app-debug-androidTest.apk" >> "$OUT/install.txt" 2>&1
     smoke=(-e downloadSmokeModels true -e acceptModelLicencesForSmoke true)
-    start=$(date +%s); instrument clone com.voicestudio.mobile.LocalInferenceTest#phoneVoiceUsesRealDecoderWhisperAndOmniVoice -e cloneInferenceSmoke true "${smoke[@]}"
-    result "Voice cloning with OmniVoice on the device ($(( $(date +%s) - start )) s including downloads)" $?
+    start=$(date +%s); instrument clone com.voicestudio.mobile.VoziaHeavyTaskTest -e heavyTasks true -e acceptModelLicences true
+    result "Cloned-voice task: OmniVoice progress, Piper task finishes alongside it, cancel frees OmniVoice ($(( $(date +%s) - start )) s including downloads)" $?
     start=$(date +%s); instrument dub com.voicestudio.mobile.PhoneDubInferenceTest -e dubInferenceSmoke true "${smoke[@]}"
     result "Phone dub: Whisper → Qwen3 translation to French → OmniVoice, muxed output ($(( $(date +%s) - start )) s)" $?
     adb logcat -d > "$OUT/logcat.txt" 2>&1 || true
+    log ""; log "Failures: $failures"; exit $failures
+fi
+
+if [[ $FULL == models ]]; then
+    # Every downloadable text-to-speech model through the background task, as the Speak screen runs it.
+    log "## TTS models · $(adb shell getprop ro.product.model | tr -d '\r') · API $(adb shell getprop ro.build.version.sdk | tr -d '\r')"
+    adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; adb install -r "$DIST/app-debug-androidTest.apk" >> "$OUT/install.txt" 2>&1
+    start=$(date +%s); instrument models com.voicestudio.mobile.VoziaModelMatrixTest -e modelMatrix true -e acceptModelLicences true
+    result "Every TTS model speaks through a background task ($(( $(date +%s) - start )) s including downloads)" $?
+    adb logcat -d > "$OUT/logcat.txt" 2>&1 || true
+    grep -E "FATAL EXCEPTION|AndroidRuntime|signal [0-9]+ \(SIG" -A20 "$OUT/logcat.txt" | head -80 > "$OUT/crashes.txt" || true
     log ""; log "Failures: $failures"; exit $failures
 fi
 

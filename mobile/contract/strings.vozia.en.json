@@ -20,7 +20,8 @@
    "default_voice": "Default voice",
    "cloned_voice": "Cloned voice on this phone",
    "system_hint": "Uses the speech engine installed on this phone. For VoiceStudio AI voices, pick a model such as Piper, Supertonic or Kokoro.",
-   "background_hint": "You can leave this screen or close the app; the task continues in the background and appears in Tasks."
+   "background_hint": "You can leave this screen or close the app; the task continues in the background and appears in Tasks.",
+   "clone_slow": "Cloned voices run the large OmniVoice model on the phone: expect seconds to minutes per sentence. Progress shows while it works, and other voices keep working meanwhile."
   },
   "project": {
    "default_name": "My audio",
@@ -114,7 +115,14 @@
    "project_missing": "The project was deleted.",
    "voice_missing": "The selected cloned voice was deleted.",
    "empty_text": "There is no text to read.",
-   "still_running": "Cancel the task before deleting it."
+   "still_running": "Cancel the task before deleting it.",
+   "waiting_engine": "Waiting for another task to free the model",
+   "open": "Open in project",
+   "elapsed": "Started {{time}} ago",
+   "idle": "no visible progress for {{time}}",
+   "result_deleted": "The result of this task was deleted.",
+   "too_many_attempts": "This task was interrupted too many times (the app closed or Android stopped it). Try a smaller text or another model, and allow background use in Settings.",
+   "paused_by_android": "Paused by Android's time limit; open the app to continue"
   },
   "audiobook": {
    "title": "Audiobooks",
@@ -171,12 +179,32 @@
   },
   "dictate": {
    "english_only": "The streaming English model shows words as you speak. For Portuguese and other languages choose Whisper: each phrase appears after a short pause."
+  },
+  "dub": {
+   "duplicate": "This file is already being dubbed. Follow it below, or remove that job first to start again.",
+   "segment": "Phrase {{current}} of {{total}}"
+  },
+  "battery": {
+   "hint": "Android is limiting this app's battery use, so long tasks may pause while the screen is off. Allow it to run in the background for reliable generation, cloning and dubbing.",
+   "allow": "Allow background use",
+   "restricted": "Battery: restricted by Android (long tasks may pause)",
+   "unrestricted": "Battery: background use allowed"
+  },
+  "performance": {
+   "title": "Performance and background",
+   "cpu": "Processor acceleration: {{variant}} · {{cores}} cores",
+   "copy_report": "Copy diagnostic report",
+   "copied": "Report copied. It lists your device, models and recent tasks, without texts or audio."
   }
  },
  "mobile": {
   "local": {
    "system_tts_unavailable": "No speech engine is installed on this phone. Install one (for example Speech Services by Google) or download a VoiceStudio model.",
-   "system_tts_language": "The phone's speech engine has no voice for this language. Pick another language or a VoiceStudio model."
+   "system_tts_language": "The phone's speech engine has no voice for this language. Pick another language or a VoiceStudio model.",
+   "system_tts_timeout": "The phone's speech engine stopped responding. Open the app again and retry; if it keeps happening, update or switch the speech engine in Android settings, or pick a VoiceStudio model."
+  },
+  "android": {
+   "stage_waiting": "Waiting for another task to finish"
   }
  }
 }

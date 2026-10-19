@@ -1,0 +1,41 @@
+diff -ru a/src/maskgit-tts.h b/src/maskgit-tts.h
+--- a/src/maskgit-tts.h
++++ b/src/maskgit-tts.h
+@@ -127,6 +127,11 @@
+     ctr_lo += 1;
+ }
+ 
++// VoiceStudio Android: per-step hook for progress and cooperative cancel. Set on
++// the calling thread by ov_vozia_set_step_hook; returning true stops decoding.
++static thread_local bool (*vozia_step_hook)(void * ud, int step, int num_step) = nullptr;
++static thread_local void * vozia_step_hook_ud                                 = nullptr;
++
+ // Run the iterative decoder. Returns flat audio_tokens of size K * T (k slow,
+ // t fast). The prompt input_ids buffer is mutated in place during decoding.
+ // ctr_lo_inout, when non-NULL, threads the Philox counter across successive
+@@ -176,6 +181,10 @@
+                                       S);
+ 
+     for (int step = 0; step < cfg.num_step; step++) {
++        if (vozia_step_hook && vozia_step_hook(vozia_step_hook_ud, step, cfg.num_step)) {
++            fprintf(stderr, "[MaskGIT] Stopped by step hook at step %d\n", step);
++            return {};
++        }
+         int k_demask = sched[step];
+         if (k_demask <= 0) {
+             continue;
+diff -ru a/src/pipeline-tts.cpp b/src/pipeline-tts.cpp
+--- a/src/pipeline-tts.cpp
++++ b/src/pipeline-tts.cpp
+@@ -1435,3 +1435,11 @@
+     out->channels    = 1;
+     return OV_STATUS_OK;
+ }
++
++// VoiceStudio Android: installs the MaskGIT step hook for ov_synthesize calls made
++// on this thread (NULL removes it). Lives in this file because the hook state is
++// per translation unit.
++extern "C" void ov_vozia_set_step_hook(bool (*hook)(void * ud, int step, int num_step), void * ud) {
++    vozia_step_hook    = hook;
++    vozia_step_hook_ud = ud;
++}

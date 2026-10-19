@@ -102,6 +102,10 @@ import java.io.File
             val selectedModels=models.toList()
             val exportAudio=audioOnly
             vm.run {
+                // The same file already waiting or in progress would only compete with itself for the models.
+                val duplicate=vm.phone.dubs.list().any {record -> !record.checkpoint.done&&record.request.title==title&&
+                    runCatching {vm.phone.dubs.file(record.request.id,record.request.sourceFile).length()==source.length()}.getOrDefault(false)}
+                if(duplicate) throw com.voicestudio.mobile.network.ClientFailure("vozia.dub.duplicate")
                 val reference=chosenVoice?.let {vm.phone.voices.reference(it)}
                 val request=vm.phone.dubs.create(source,title,chosenTargets,selectedModels,true,reference,chosenVoice?.transcript,exportAudio)
                 PhoneDubWorker.enqueue(context,request.id)
@@ -113,7 +117,9 @@ import java.io.File
         phone.dubs.filter {projectId==null || it.request.id==projectId}.filterNot {it.checkpoint.done}.forEach {record ->
             val active=works.firstOrNull {"phone-dub:${record.request.id}" in it.tags&&!it.state.isFinished}
             val percent=active?.progress?.getInt("percent",record.checkpoint.percent) ?: record.checkpoint.percent
-            val stage=active?.progress?.getString("stage") ?: record.checkpoint.stage
+            // Work that is not running yet (after a restart or behind another job) says so instead of showing its old stage.
+            val stage=if(active!=null&&active.state!=androidx.work.WorkInfo.State.RUNNING) "mobile.android.stage_waiting"
+                else active?.progress?.getString("stage") ?: record.checkpoint.stage
             Group {
                 Column(Modifier.fillMaxWidth().padding(VSTheme.inset),verticalArrangement=Arrangement.spacedBy(VSTheme.gap)) {
                     Text(record.request.title,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -124,6 +130,9 @@ import java.io.File
                         Text(tr("mobile.simple.percent",mapOf("percent" to percent)))
                     }
                     LinearProgressIndicator(progress={percent/100f},modifier=Modifier.fillMaxWidth())
+                    if(record.checkpoint.segments.isNotEmpty()&&stage in setOf("mobile.android.stage_translate","mobile.android.stage_render","mobile.android.stage_waiting"))
+                        Text(tr("vozia.dub.segment",mapOf("current" to (record.checkpoint.renders.size+1).coerceAtMost(record.checkpoint.segments.size),"total" to record.checkpoint.segments.size)),
+                            style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
                     if(active!=null) Secondary("common.cancel") {work.cancelUniqueWork("phone-dub:${record.request.id}")}
                     else Row {
                         Secondary("mobile.simple.resume") {PhoneDubWorker.enqueue(context,record.request.id)}

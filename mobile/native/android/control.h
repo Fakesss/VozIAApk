@@ -3,6 +3,10 @@
 #include <string>
 #include <cstdint>
 #include <atomic>
+#include <algorithm>
+#include <fstream>
+#include <thread>
+#include <vector>
 // JNI modified UTF-8 encodes supplementary characters differently. Convert
 // UTF-16 explicitly so model tokenizers receive standard UTF-8, including emoji.
 struct Utf8 {
@@ -65,3 +69,19 @@ struct Control {
 inline void fail(JNIEnv* e) {
     if(!e->ExceptionCheck())e->ThrowNew(e->FindClass("java/lang/IllegalStateException"),"Native inference failed");
 }
+// Cores at least half as fast as the fastest one, from the kernel's per-core
+// capacity (big.LITTLE phones); half of all cores when the kernel does not say.
+inline int fast_cores() {
+    const int count=std::max(1,static_cast<int>(std::thread::hardware_concurrency()));
+    std::vector<long> capacity;
+    for(int i=0;i<count;++i) {
+        std::ifstream file("/sys/devices/system/cpu/cpu"+std::to_string(i)+"/cpu_capacity");
+        long value=0;
+        if(file>>value&&value>0)capacity.push_back(value);
+    }
+    if(capacity.size()!=static_cast<size_t>(count))return std::max(1,count/2);
+    const long top=*std::max_element(capacity.begin(),capacity.end());
+    return static_cast<int>(std::count_if(capacity.begin(),capacity.end(),[top](long value){return value*2>=top;}));
+}
+// Threads for the large models: the fast cores, leaving room for the small-model lane.
+inline int heavy_threads() {return std::clamp(fast_cores(),2,6);}

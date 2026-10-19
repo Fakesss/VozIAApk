@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Lets the user exempt long on-device tasks from battery optimisation (one system dialog). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Android 11+ package visibility: lets TextToSpeech find the installed speech engines. -->
     <queries>
         <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>

@@ -20,7 +20,8 @@
    "default_voice": "Voz padrão",
    "cloned_voice": "Voz clonada neste celular",
    "system_hint": "Usa o mecanismo de voz instalado neste celular. Para as vozes de IA do VoiceStudio, escolha um modelo como Piper, Supertonic ou Kokoro.",
-   "background_hint": "Você pode sair desta tela ou fechar o app; a tarefa continua em segundo plano e aparece em Tarefas."
+   "background_hint": "Você pode sair desta tela ou fechar o app; a tarefa continua em segundo plano e aparece em Tarefas.",
+   "clone_slow": "Vozes clonadas usam o modelo grande OmniVoice no celular: conte com segundos a minutos por frase. O progresso aparece enquanto ele trabalha, e as outras vozes continuam funcionando nesse meio-tempo."
   },
   "project": {
    "default_name": "Meus áudios",
@@ -114,7 +115,14 @@
    "project_missing": "O projeto foi excluído.",
    "voice_missing": "A voz clonada escolhida foi excluída.",
    "empty_text": "Não há texto para ler.",
-   "still_running": "Cancele a tarefa antes de excluí-la."
+   "still_running": "Cancele a tarefa antes de excluí-la.",
+   "waiting_engine": "Aguardando outra tarefa liberar o modelo",
+   "open": "Abrir no projeto",
+   "elapsed": "Iniciada há {{time}}",
+   "idle": "sem avanço visível há {{time}}",
+   "result_deleted": "O resultado desta tarefa foi excluído.",
+   "too_many_attempts": "Esta tarefa foi interrompida vezes demais (o app fechou ou o Android a parou). Tente um texto menor ou outro modelo e permita o uso em segundo plano em Ajustes.",
+   "paused_by_android": "Pausada pelo limite de tempo do Android; abra o app para continuar"
   },
   "audiobook": {
    "title": "Audiolivros",
@@ -171,16 +179,36 @@
   },
   "dictate": {
    "english_only": "O modelo de streaming é só em inglês e mostra as palavras enquanto você fala. Para português e outros idiomas escolha o Whisper: cada frase aparece após uma pequena pausa."
+  },
+  "dub": {
+   "duplicate": "Este arquivo já está sendo dublado. Acompanhe abaixo ou remova esse trabalho antes de começar de novo.",
+   "segment": "Frase {{current}} de {{total}}"
+  },
+  "battery": {
+   "hint": "O Android está limitando a bateria deste app, então tarefas longas podem pausar com a tela desligada. Permita rodar em segundo plano para gerar, clonar e dublar sem interrupções.",
+   "allow": "Permitir em segundo plano",
+   "restricted": "Bateria: restrita pelo Android (tarefas longas podem pausar)",
+   "unrestricted": "Bateria: uso em segundo plano permitido"
+  },
+  "performance": {
+   "title": "Desempenho e segundo plano",
+   "cpu": "Aceleração do processador: {{variant}} · {{cores}} núcleos",
+   "copy_report": "Copiar relatório de diagnóstico",
+   "copied": "Relatório copiado. Ele lista o aparelho, os modelos e as tarefas recentes, sem textos nem áudios."
   }
  },
  "mobile": {
   "local": {
    "system_tts_unavailable": "Nenhum mecanismo de voz está instalado neste celular. Instale um (por exemplo, Serviços de fala do Google) ou baixe um modelo do VoiceStudio.",
-   "system_tts_language": "O mecanismo de voz do celular não tem voz para este idioma. Escolha outro idioma ou um modelo do VoiceStudio."
+   "system_tts_language": "O mecanismo de voz do celular não tem voz para este idioma. Escolha outro idioma ou um modelo do VoiceStudio.",
+   "system_tts_timeout": "O mecanismo de voz do celular parou de responder. Tente de novo; se continuar, atualize ou troque o mecanismo de voz nas configurações do Android, ou escolha um modelo do VoiceStudio."
   },
   "tabs": {
    "settings": "Ajustes",
    "dub": "Dublar"
+  },
+  "android": {
+   "stage_waiting": "Aguardando outra tarefa terminar"
   }
  }
 }

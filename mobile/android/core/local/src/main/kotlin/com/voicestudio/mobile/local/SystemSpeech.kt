@@ -28,16 +28,29 @@ class SystemSpeech(context: Context) {
     private val mutex = Mutex()
     private var engine: TextToSpeech? = null
 
+    /** Binds the engine once; an engine that never answers counts as missing. */
     private suspend fun ready(): TextToSpeech = engine ?: withContext(Dispatchers.Main) {
-        engine ?: suspendCancellableCoroutine<TextToSpeech> { continuation ->
-            var created: TextToSpeech? = null
-            created = TextToSpeech(app) { status ->
-                val tts = created
-                if (status == TextToSpeech.SUCCESS && tts != null) { engine = tts; if (continuation.isActive) continuation.resume(tts) }
-                else { tts?.shutdown(); if (continuation.isActive) continuation.resumeWith(Result.failure(ClientFailure("mobile.local.system_tts_unavailable"))) }
+        engine ?: withTimeoutOrNull(INIT_TIMEOUT_MS) {
+            suspendCancellableCoroutine<TextToSpeech> { continuation ->
+                var created: TextToSpeech? = null
+                created = TextToSpeech(app) { status ->
+                    val tts = created
+                    if (status == TextToSpeech.SUCCESS && tts != null) { engine = tts; if (continuation.isActive) continuation.resume(tts) }
+                    else { tts?.shutdown(); if (continuation.isActive) continuation.resumeWith(Result.failure(ClientFailure("mobile.local.system_tts_unavailable"))) }
+                }
+                continuation.invokeOnCancellation { if (engine !== created) created?.shutdown() }
             }
-            continuation.invokeOnCancellation { if (engine !== created) created?.shutdown() }
-        }
+        } ?: throw ClientFailure("mobile.local.system_tts_unavailable")
+    }
+
+    /**
+     * Drops the bound engine. Speech engines run in their own process, which the
+     * system (or an aggressive battery manager) may kill; the old binding then
+     * accepts requests but never reports back, so the next call binds a new one.
+     */
+    private suspend fun reset() = withContext(NonCancellable + Dispatchers.Main) {
+        engine?.let { runCatching { it.stop() }; runCatching { it.shutdown() } }
+        engine = null
     }
 
     /** Offline voices only, sorted so a preset index stays stable between launches. */
@@ -62,6 +75,30 @@ class SystemSpeech(context: Context) {
 
     suspend fun synthesize(text: String, language: String?, speaker: Int, speed: Float, progress: (Float) -> Unit): LocalAudio = mutex.withLock {
         require(text.isNotBlank() && speed in .5f..2f)
+        val chunks = splitForSynthesis(text, (TextToSpeech.getMaxSpeechInputLength() - 100).coerceIn(500, 3900))
+        val directory = File(app.cacheDir, "system-tts").apply { mkdirs() }
+        var rate = 0
+        val samples = ArrayList<FloatArray>()
+        chunks.forEachIndexed { index, chunk ->
+            currentCoroutineContext().ensureActive()
+            val file = File(directory, UUID.randomUUID().toString() + ".wav")
+            try {
+                renderChunk(chunk, file, language, speaker, speed)
+                val audio = readWave(file)
+                if (rate == 0) rate = audio.sampleRate
+                samples += if (audio.sampleRate == rate) audio.samples else MonoResampler(audio.sampleRate, rate).accept(audio.samples)
+            } finally { file.delete() }
+            progress((index + 1f) / chunks.size)
+        }
+        val joined = FloatArray(samples.sumOf { it.size })
+        var offset = 0
+        samples.forEach { it.copyInto(joined, offset); offset += it.size }
+        if (joined.isEmpty() || rate <= 0) throw ClientFailure("mobile.local.inference_failed")
+        LocalAudio(joined, rate)
+    }
+
+    /** Selects the voice, language and rate on the bound engine. */
+    private suspend fun configured(language: String?, speaker: Int, speed: Float): TextToSpeech {
         val tts = ready()
         val voices = voicesFor(tts, language)
         val voice = voices.getOrNull(speaker) ?: voices.firstOrNull()
@@ -70,47 +107,45 @@ class SystemSpeech(context: Context) {
             else if (language != null && tts.setLanguage(Locale.forLanguageTag(language)) < TextToSpeech.LANG_AVAILABLE) throw ClientFailure("mobile.local.system_tts_language")
             tts.setSpeechRate(speed)
         }
-        val chunks = splitForSynthesis(text, (TextToSpeech.getMaxSpeechInputLength() - 100).coerceIn(500, 3900))
-        val directory = File(app.cacheDir, "system-tts").apply { mkdirs() }
-        var rate = 0
-        val samples = ArrayList<FloatArray>()
-        try {
-            chunks.forEachIndexed { index, chunk ->
-                currentCoroutineContext().ensureActive()
-                val file = File(directory, UUID.randomUUID().toString() + ".wav")
-                try {
-                    render(tts, chunk, file)
-                    val audio = readWave(file)
-                    if (rate == 0) rate = audio.sampleRate
-                    samples += if (audio.sampleRate == rate) audio.samples else MonoResampler(audio.sampleRate, rate).accept(audio.samples)
-                } finally { file.delete() }
-                progress((index + 1f) / chunks.size)
-            }
-        } catch (e: CancellationException) { withContext(NonCancellable + Dispatchers.Main) { tts.stop() }; throw e }
-        val joined = FloatArray(samples.sumOf { it.size })
-        var offset = 0
-        samples.forEach { it.copyInto(joined, offset); offset += it.size }
-        if (joined.isEmpty() || rate <= 0) throw ClientFailure("mobile.local.inference_failed")
-        LocalAudio(joined, rate)
+        return tts
     }
 
-    private suspend fun render(tts: TextToSpeech, text: String, file: File) = suspendCancellableCoroutine<Unit> { continuation ->
-        val id = UUID.randomUUID().toString()
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
-            override fun onDone(utteranceId: String?) { if (utteranceId == id && continuation.isActive) continuation.resume(Unit) }
-            @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) { onError(utteranceId, TextToSpeech.ERROR) }
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                if (utteranceId == id && continuation.isActive) continuation.resumeWith(Result.failure(ClientFailure("mobile.local.inference_failed")))
-            }
-        })
-        if (tts.synthesizeToFile(text, Bundle(), file, id) != TextToSpeech.SUCCESS && continuation.isActive)
-            continuation.resumeWith(Result.failure(ClientFailure("mobile.local.inference_failed")))
-        continuation.invokeOnCancellation { tts.stop() }
+    /** One chunk, retried once on a freshly bound engine when the first one stalls or errors. */
+    private suspend fun renderChunk(text: String, file: File, language: String?, speaker: Int, speed: Float) {
+        var outcome = Outcome.ERROR
+        repeat(2) {
+            val tts = configured(language, speaker, speed)
+            outcome = try { render(tts, text, file) } catch (e: CancellationException) { withContext(NonCancellable + Dispatchers.Main) { runCatching { tts.stop() } }; throw e }
+            if (outcome == Outcome.DONE && file.length() > 44) return
+            reset()
+        }
+        throw ClientFailure(if (outcome == Outcome.TIMEOUT) "mobile.local.system_tts_timeout" else "mobile.local.inference_failed")
     }
+
+    private enum class Outcome { DONE, ERROR, TIMEOUT }
+
+    private suspend fun render(tts: TextToSpeech, text: String, file: File): Outcome = withTimeoutOrNull(renderTimeout(text)) {
+        suspendCancellableCoroutine<Outcome> { continuation ->
+            val id = UUID.randomUUID().toString()
+            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) { if (utteranceId == id && continuation.isActive) continuation.resume(Outcome.DONE) }
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) { onError(utteranceId, TextToSpeech.ERROR) }
+                override fun onError(utteranceId: String?, errorCode: Int) { if (utteranceId == id && continuation.isActive) continuation.resume(Outcome.ERROR) }
+            })
+            if (tts.synthesizeToFile(text, Bundle(), file, id) != TextToSpeech.SUCCESS && continuation.isActive) continuation.resume(Outcome.ERROR)
+            continuation.invokeOnCancellation { runCatching { tts.stop() } }
+        }
+    } ?: Outcome.TIMEOUT
 
     fun release() { engine?.shutdown(); engine = null }
+
+    companion object {
+        private const val INIT_TIMEOUT_MS = 20_000L
+        /** Engines render far faster than real time; this only catches one that stopped answering. */
+        fun renderTimeout(text: String): Long = (30_000L + text.length * 150L).coerceAtMost(300_000L)
+    }
 }
 
 /** Splits at paragraph, sentence, then word boundaries; no chunk exceeds [limit] characters. */

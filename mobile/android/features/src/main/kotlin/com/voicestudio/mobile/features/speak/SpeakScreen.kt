@@ -107,7 +107,6 @@ fun preferredLanguage(languages: List<String>, device: String): String? {
     val capability=if(voice==null) "tts" else "clone"
     val selected=model?.takeIf {it.capability==capability} ?: phone.models.firstOrNull {it.capability==capability&&it.id in phone.installed} ?: phone.models.firstOrNull {it.capability==capability}
     LaunchedEffect(phone.voices) {if(speaker.startsWith("phone:")&&voice==null) speaker="0"}
-    DisposableEffect(Unit) {onDispose {vm.phone.cancelInference()}}
     var language by rememberSaveable {mutableStateOf("")}
     LaunchedEffect(selected?.id,voice?.id,selected?.languages) {
         language=if(voice!=null) "auto" else language.takeIf {it in selected?.languages.orEmpty()} ?: preferredLanguage(selected?.languages.orEmpty(),l.locale).orEmpty()
@@ -148,23 +147,22 @@ fun preferredLanguage(languages: List<String>, device: String): String? {
         val speaking=phone.speaking
         val defaultName=tr("vozia.project.default_name")
         if(selected?.let {!phone.canRun(it,vm.phone.ramBytes)}!=false) selected?.let {com.voicestudio.mobile.features.models.MissingModelsCard(vm,"mobile.tabs.speak",listOf(it))}
-        else Action(if(speaking!=null) "mobile.speak.generating" else "mobile.speak.generate",text.isNotBlank()&&text.length<=200_000&&selected!=null&&validSpeaker&&speaking==null&&phone.speechTask==null) {
+        else Action("mobile.speak.generate",text.isNotBlank()&&text.length<=200_000&&selected!=null&&validSpeaker&&!phone.submitting) {
             val name=presets.firstOrNull {it.id==speaker}?.let {it.supporting?.takeIf {_ -> selected!!.system} ?: it.title}
             vm.phone.speak(selected!!,text,speaker.toIntOrNull() ?: 0,voice,language.takeUnless {it=="auto"||it.isBlank()},speed,projectId,title,name,defaultName)
         }
-        if(phone.speechTask!=null) {
-            LinearProgressIndicator(progress={phone.progress ?: 0f},modifier=Modifier.fillMaxWidth())
-            Text(tr(speaking?.stage ?: "vozia.task.queued"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
-            Text(tr("vozia.speak.background_hint"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
-            Secondary("common.cancel") {vm.phone.cancelSpeech()}
-        }
-        phone.audioItem?.let {item ->
+        if(selected?.capability=="clone") Text(tr("vozia.speak.clone_slow"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
+        // The latest generation: live stage and time, while earlier ones continue in Tasks.
+        speaking?.let {task -> com.voicestudio.mobile.features.library.TaskCard(vm,task)}
+        if(speaking!=null) Text(tr("vozia.speak.background_hint"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
+        phone.audioItem?.takeUnless {phone.autoPlay}?.let {item ->
             phone.audio?.let {file -> LocalAudioPlayer(file,vm::fail)}
             val folder=phone.projects.firstOrNull {it.id==item.projectId}?.name
             com.voicestudio.mobile.features.library.ExportActions(vm,item,folder)
         }
         Heading("mobile.speak.recent")
         if(phone.recent.isEmpty()) EmptyState("mobile.simple.empty_recent")
+        var deleting by remember {mutableStateOf<com.voicestudio.mobile.data.library.LibraryItem?>(null)}
         phone.recent.forEach {item ->
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -173,8 +171,15 @@ fun preferredLanguage(languages: List<String>, device: String): String? {
                         style=MaterialTheme.typography.bodySmall,color=role("textMuted"),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
                 IconAction("player.play",Icons.Default.PlayArrow) {vm.phone.play(item)}
-                IconAction("common.delete",Icons.Default.Delete) {vm.phone.deleteGeneration(item)}
+                IconAction("common.delete",Icons.Default.Delete) {deleting=item}
             }
+            // ▶ plays right here, under the row that was tapped.
+            if(phone.autoPlay&&phone.audioItem?.id==item.id) phone.audio?.let {file -> LocalAudioPlayer(file,vm::fail,autoPlay=true)}
+        }
+        deleting?.let {item ->
+            AlertDialog(onDismissRequest={deleting=null},title={Text(tr("vozia.item.delete_title"))},text={Text(item.title)},
+                confirmButton={TextButton(onClick={deleting=null;vm.phone.deleteGeneration(item)}) {Text(tr("common.delete"),color=role("error"))}},
+                dismissButton={TextButton(onClick={deleting=null}) {Text(tr("common.cancel"))}})
         }
     }
 }

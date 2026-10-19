@@ -17,16 +17,33 @@ toolchains=("$ndk/toolchains/llvm/prebuilt/"*)
 toolchain="${toolchains[0]}"
 omni_commit="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["omnivoice.cpp"]["source"]["commit"])' "$root/../pins.json")"
 llama_commit="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["llama.cpp"]["source"]["commit"])' "$root/../pins.json")"
+# Local patches (see patches/): each applied once to the verified upstream tree.
+omni_source="$root/build/sources/omnivoice.cpp-$omni_commit"
+grep -q vozia_step_hook "$omni_source/src/maskgit-tts.h" || patch -d "$omni_source" -p1 --forward --batch < "$root/patches/omnivoice-step-hook.patch"
+grep -q ov_vozia_n_threads "$omni_source/src/backend.h" || patch -d "$omni_source" -p1 --forward --batch < "$root/patches/omnivoice-threads.patch"
+# Each ABI ships a baseline build plus faster CPU-feature variants; the app loads
+# the best one the phone's CPU reports (NativeBridge.load). Variant suffixes and
+# flags must match NativeBridge.variants and verify.py.
+variants() {
+    case "$1" in
+        arm64-v8a) printf '%s\n' ":" "_dotprod:-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16" "_i8mm:-DGGML_CPU_ARM_ARCH=armv8.6-a+dotprod+fp16+i8mm" ;;
+        x86_64) printf '%s\n' ":" "_avx2:-DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON" ;;
+    esac
+}
 for abi in arm64-v8a x86_64; do
-    common=(-G Ninja -DCMAKE_MAKE_PROGRAM="$ninja" -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-29 -DANDROID_STL=c++_shared -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_LLAMAFILE=OFF -DGGML_CPU_KLEIDIAI=OFF -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384)
-    "$cmake" -S "$root/build/sources/omnivoice.cpp-$omni_commit" -B "$root/build/omni-$abi" "${common[@]}" -DOMNIVOICE_SHARED=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF
-    "$cmake" --build "$root/build/omni-$abi" --target omnivoice-core -j "${NATIVE_JOBS:-2}"
-    "$cmake" -S "$root/build/sources/llama.cpp-$llama_commit" -B "$root/build/llama-$abi" "${common[@]}" -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_COMMIT="$llama_commit" -DLLAMA_BUILD_NUMBER=11716 -DGGML_METAL=OFF -DGGML_BLAS=OFF
-    "$cmake" --build "$root/build/llama-$abi" --target llama -j "${NATIVE_JOBS:-2}"
-    "$cmake" -S "$root" -B "$root/build/jni-$abi" "${common[@]}" -DOMNI_SOURCE="$root/build/sources/omnivoice.cpp-$omni_commit" -DLLAMA_SOURCE="$root/build/sources/llama.cpp-$llama_commit" -DRUNTIME_ABI="$abi"
-    "$cmake" --build "$root/build/jni-$abi" -j "${NATIVE_JOBS:-2}"
+    common=(-G Ninja -DCMAKE_MAKE_PROGRAM="$ninja" -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-29 -DANDROID_STL=c++_shared -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_LLAMAFILE=ON -DGGML_CPU_KLEIDIAI=OFF -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384)
     mkdir -p "$root/build/jniLibs/$abi"
-    cp "$root/build/jni-$abi/"libvs_*.so "$root/build/jniLibs/$abi/"
+    while IFS= read -r variant; do
+        suffix="${variant%%:*}"
+        read -r -a flags <<< "${variant#*:}"
+        "$cmake" -S "$root/build/sources/omnivoice.cpp-$omni_commit" -B "$root/build/omni-$abi$suffix" "${common[@]}" ${flags[@]+"${flags[@]}"} -DOMNIVOICE_SHARED=OFF -DGGML_METAL=OFF -DGGML_BLAS=OFF
+        "$cmake" --build "$root/build/omni-$abi$suffix" --target omnivoice-core -j "${NATIVE_JOBS:-2}"
+        "$cmake" -S "$root/build/sources/llama.cpp-$llama_commit" -B "$root/build/llama-$abi$suffix" "${common[@]}" ${flags[@]+"${flags[@]}"} -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_COMMIT="$llama_commit" -DLLAMA_BUILD_NUMBER=11716 -DGGML_METAL=OFF -DGGML_BLAS=OFF
+        "$cmake" --build "$root/build/llama-$abi$suffix" --target llama -j "${NATIVE_JOBS:-2}"
+        "$cmake" -S "$root" -B "$root/build/jni-$abi$suffix" "${common[@]}" -DOMNI_SOURCE="$root/build/sources/omnivoice.cpp-$omni_commit" -DLLAMA_SOURCE="$root/build/sources/llama.cpp-$llama_commit" -DRUNTIME_ABI="$abi$suffix" -DRUNTIME_SUFFIX="$suffix"
+        "$cmake" --build "$root/build/jni-$abi$suffix" -j "${NATIVE_JOBS:-2}"
+        cp "$root/build/jni-$abi$suffix/"libvs_*.so "$root/build/jniLibs/$abi/"
+    done < <(variants "$abi")
     cp "$toolchain/sysroot/usr/lib/$([[ "$abi" == arm64-v8a ]] && echo aarch64-linux-android || echo x86_64-linux-android)/libc++_shared.so" "$root/build/jniLibs/$abi/"
 done
 

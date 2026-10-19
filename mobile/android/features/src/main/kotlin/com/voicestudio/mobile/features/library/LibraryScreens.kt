@@ -84,7 +84,9 @@ fun taskStateKey(state: String) = "vozia.task.state_$state"
             Secondary("vozia.project.rename") { renaming = true }
             Secondary("common.delete") { vm.phone.launch { confirm = vm.phone.library.deletionPreview(project.id) } }
         }
-        phone.tasks.filter { it.projectId == project.id }.take(5).forEach { TaskCard(vm, it) }
+        // Finished tasks appear below as their saved items; only work in progress or needing attention is listed.
+        phone.tasks.filter { it.projectId == project.id && (it.active || it.state == TaskState.FAILED || it.state == TaskState.SUCCEEDED && items.none { item -> item.id == it.resultItem }) }
+            .take(5).forEach { TaskCard(vm, it) }
         if (items.isEmpty()) EmptyState("vozia.project.empty")
         items.sortedWith(compareBy<LibraryItem> { it.kind != ItemKind.AUDIOBOOK }.thenBy { it.position }.thenByDescending { it.createdAt }).forEach { ItemCard(vm, it, project.name) }
     }
@@ -119,7 +121,7 @@ fun taskStateKey(state: String) = "vozia.task.state_$state"
                 IconAction(if (expanded) "vozia.item.collapse" else "vozia.item.expand", if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown) { expanded = !expanded }
             }
             if (expanded) {
-                if (phone.audioItem?.id == item.id) phone.audio?.let { LocalAudioPlayer(it, vm::fail) }
+                if (phone.audioItem?.id == item.id) phone.audio?.let { LocalAudioPlayer(it, vm::fail, autoPlay = phone.autoPlay) }
                 if (item.kind == ItemKind.TRANSCRIPT || item.kind == ItemKind.SUBTITLE) {
                     val content by produceState("", item.id) { value = runCatching { vm.phone.library.file(item)?.readText().orEmpty() }.getOrDefault("") }
                     SelectionContainer { Text(content.take(20_000), style = MaterialTheme.typography.bodyMedium) }
@@ -138,38 +140,70 @@ fun taskStateKey(state: String) = "vozia.task.state_$state"
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("common.cancel")) } })
 }
 
-@Composable fun TaskCard(vm: StudioViewModel, task: TaskRecord) {
+/** "<1 min", "12 min" or "3 h 05 min"; the units read the same in English and Portuguese. */
+fun elapsedText(milliseconds: Long): String {
+    val minutes = milliseconds.coerceAtLeast(0) / 60_000
+    return when { minutes < 1 -> "<1 min"; minutes < 60 -> "$minutes min"; else -> "%d h %02d min".format(java.util.Locale.ROOT, minutes / 60, minutes % 60) }
+}
+
+/**
+ * A task with its live stage, how long it has been running, and, once done, its
+ * result: play it here or open the project that holds it.
+ */
+@Composable fun TaskCard(vm: StudioViewModel, task: TaskRecord, open: ((String) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val phone by vm.phone.state.collectAsState()
+    val result by produceState<LibraryItem?>(null, task.resultItem, phone.revision) { value = task.resultItem?.let { vm.phone.library.item(it) } }
+    var playing by rememberSaveable(task.id) { mutableStateOf(false) }
+    val now by produceState(System.currentTimeMillis(), task.active) {
+        while (task.active) { value = System.currentTimeMillis(); kotlinx.coroutines.delay(15_000) }
+    }
     Group {
         Column(Modifier.fillMaxWidth().padding(VSTheme.inset).testTag("task.${task.id}"), verticalArrangement = Arrangement.spacedBy(VSTheme.gap / 2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(task.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(tr("vozia.task.kind_${task.kind}") + " · " + tr(taskStateKey(task.state)), style = MaterialTheme.typography.bodySmall,
+                    // A started task that waits for another one's model reads as waiting, not processing.
+                    val state = if (task.stage == "vozia.task.waiting_engine") TaskState.QUEUED else task.state
+                    Text(tr("vozia.task.kind_${task.kind}") + " · " + tr(taskStateKey(state)), style = MaterialTheme.typography.bodySmall,
                         color = role(if (task.state == TaskState.FAILED) "error" else "textMuted"))
                 }
                 when {
                     task.active -> IconAction("common.cancel", Icons.Default.Close) { scope.launch { LibraryWorker.cancel(context, vm.phone.library, task.id) } }
                     task.state == TaskState.FAILED || task.state == TaskState.CANCELLED -> IconAction("vozia.task.retry", Icons.Default.Refresh) { scope.launch { LibraryWorker.retry(context, vm.phone.library, task.id) } }
                 }
+                result?.let { item ->
+                    if (item.mime?.startsWith("audio/") == true) IconAction("player.play", Icons.Default.PlayArrow) { vm.phone.play(item); playing = true }
+                    if (open != null) IconAction("vozia.task.open", VSIcons.Folder) { open(item.projectId) }
+                }
                 if (!task.active) IconAction("common.delete", Icons.Default.Delete) { vm.phone.launch { vm.phone.library.deleteTask(task.id) } }
             }
             if (task.active) {
                 LinearProgressIndicator(progress = { task.progress }, modifier = Modifier.fillMaxWidth())
                 Text(tr(task.stage) + " · " + (task.progress * 100).toInt() + "%", style = MaterialTheme.typography.bodySmall, color = role("textMuted"))
+                val idle = now - task.updatedAt
+                Text(tr("vozia.task.elapsed", mapOf("time" to elapsedText(now - task.createdAt))) +
+                    (if (task.state == TaskState.RUNNING && idle > 120_000) " · " + tr("vozia.task.idle", mapOf("time" to elapsedText(idle))) else ""),
+                    style = MaterialTheme.typography.bodySmall, color = role("textMuted"))
             }
-            task.error?.let { ErrorMessage(it) }
+            if (task.state == TaskState.SUCCEEDED && task.resultItem != null && result == null) Text(tr("vozia.task.result_deleted"), style = MaterialTheme.typography.bodySmall, color = role("textMuted"))
+            if (playing && result != null && phone.audioItem?.id == result?.id) phone.audio?.let { LocalAudioPlayer(it, vm::fail, autoPlay = true) }
+            task.error?.let { ErrorMessage(it, com.voicestudio.mobile.features.errorParams(task.errorParams)) }
         }
     }
 }
 
-@Composable fun TasksScreen(vm: StudioViewModel) {
+@Composable fun TasksScreen(vm: StudioViewModel, open: (String) -> Unit = {}) {
     val phone by vm.phone.state.collectAsState()
+    val context = LocalContext.current
+    // A waiting task whose work request was lost (stopped by Android, cancelled from the notification) starts again.
+    LaunchedEffect(Unit) { runCatching { LibraryWorker.resumeQueued(context, vm.phone.library) } }
     Screen {
         ScreenTitle("vozia.task.title")
         Text(tr("vozia.task.hint"), style = MaterialTheme.typography.bodySmall, color = role("textMuted"))
         if (phone.tasks.isEmpty()) EmptyState("vozia.task.empty")
-        phone.tasks.forEach { TaskCard(vm, it) }
+        if (phone.tasks.any { it.active }) com.voicestudio.mobile.features.settings.BatteryHint()
+        phone.tasks.forEach { TaskCard(vm, it, open) }
     }
 }
