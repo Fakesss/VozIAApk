@@ -28,7 +28,9 @@ import com.voicestudio.mobile.local.*
         Text(tr("mobile.local.storage_used",mapOf("size" to Formatter.formatFileSize(LocalContext.current,state.used))))
         Toggle("mobile.simple.mobile_data",preferences.allowMobileModels) {allowed -> vm.preference {it.copy(allowMobileModels=allowed)}}
         if(state.loading) InlineLoading()
-        state.models.filterNot {it.system}.forEach {model -> ModelCard(vm,model)}
+        // Models that speak the app's language come first (Piper/Supertonic/Kokoro for Portuguese).
+        val language=java.util.Locale.forLanguageTag(LocalL10n.current.locale).language
+        state.models.filterNot {it.system}.sortedByDescending {model -> model.languages.any {java.util.Locale.forLanguageTag(it).language==language}}.forEach {model -> ModelCard(vm,model)}
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)

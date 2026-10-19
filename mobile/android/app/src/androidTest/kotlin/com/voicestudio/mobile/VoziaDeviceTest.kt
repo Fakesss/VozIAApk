@@ -120,7 +120,7 @@ class VoziaDeviceTest {
         report("export_location", wav.location)
         assertTrue(wav.location, wav.location.startsWith("Download/VoiceStudio/Teste E2E/") && wav.location.endsWith(".wav"))
         context.contentResolver.query(wav.uri, arrayOf(MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.IS_PENDING), null, null, null)!!.use {
-            assertTrue(it.moveToFirst()); assertEquals(item.size, it.getLong(0)); assertEquals("audio/wav", it.getString(1)); assertEquals(0, it.getInt(2))
+            assertTrue(it.moveToFirst()); assertEquals(item.size, it.getLong(0)); assertTrue(it.getString(1), it.getString(1) in setOf("audio/wav", "audio/x-wav")); assertEquals(0, it.getInt(2))
         }
         val exportSha = sha256(context.contentResolver.openInputStream(wav.uri)!!)
         assertEquals(item.sha256, exportSha)
@@ -198,5 +198,47 @@ class VoziaPersistenceTest {
         assertTrue("model still installed", PhoneRuntime.get(context).downloads.installed(PhoneRuntime.get(context).model("piper-pt-br-faber")))
         val id = ContentUris.parseId(Uri.parse(record.exportUri))
         report("persisted", "project=${project!!.name} item=${item.title} export=${record.exportLocation} mediaId=$id version=${BuildConfig.VERSION_NAME}")
+    }
+}
+
+/**
+ * Run while the device's data partition is almost full (device-e2e.sh fills it with
+ * fallocate and removes the filler afterwards): every write path must refuse with a
+ * storage message and leave no partial file behind.
+ */
+@RunWith(AndroidJUnit4::class)
+class VoziaLowSpaceTest {
+    @Test fun lowStorageIsReportedAndLeavesNoPartialFiles() = runBlocking<Unit> {
+        val args = InstrumentationRegistry.getArguments()
+        assumeTrue(args.getString("lowSpace") == "true")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val free = android.os.StatFs(context.filesDir.path).availableBytes
+        report("low_space_free_bytes", free.toString())
+        assertTrue("the script should leave less than 32 MB free, found $free", free < 32L * 1024 * 1024)
+        val runtime = PhoneRuntime.get(context)
+        val big = runtime.model("kokoro-multi-v1-0-int8")
+        runtime.licence.record(big, true)
+        try { runtime.downloads.download(big, true); fail("download must not start") }
+        catch (e: com.voicestudio.mobile.network.ClientFailure) { assertEquals("mobile.local.storage_required", e.key) }
+        assertFalse(runtime.downloads.installed(big))
+        val library = Library.get(context)
+        val record = Json.decodeFromString(E2eRecord.serializer(), e2eFile().readText())
+        val item = library.item(record.item)!!
+        val project = library.project(record.project)!!
+        val before = library.items(project.id).size
+        // Sparse: 64 MB long without using disk space the device does not have.
+        val large = File(context.cacheDir, "large.wav").apply { java.io.RandomAccessFile(this, "rw").use { it.setLength(64L shl 20) } }
+        try {
+            library.addFile(project.id, ItemKind.IMPORT, "grande", "", large, "audio/wav", "wav")
+            fail("a file larger than the free space must be refused")
+        } catch (e: com.voicestudio.mobile.network.ClientFailure) { assertEquals("mobile.local.storage_required", e.key) }
+        catch (e: java.io.IOException) { fail("raw IOException instead of a storage message: $e") }
+        finally { large.delete() }
+        assertEquals(before, library.items(project.id).size)
+        assertTrue("no partial files", library.root.walkTopDown().none { it.name.endsWith(".part") })
+        val exported = runCatching { Exporter(context, library).toDownloads(item, "Sem espaço") }
+        report("low_space_export", exported.exceptionOrNull()?.let { (it as? com.voicestudio.mobile.network.ClientFailure)?.key ?: it.toString() } ?: "saved ${exported.getOrNull()?.location}")
+        // A small WAV may still fit; when it does not, the message must be the storage one.
+        exported.exceptionOrNull()?.let { assertEquals("vozia.export.no_space", (it as com.voicestudio.mobile.network.ClientFailure).key) }
     }
 }

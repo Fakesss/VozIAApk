@@ -86,7 +86,7 @@ class MainActivity:ComponentActivity() {
                         val label=if(tab=="home") l.t("nav.home") else if(tab=="connect") l.t("mobile.tabs.connect") else l.t("mobile.tabs.$tab")
                         NavigationBarItem(selected=route==tab || (tab=="home" && (route=="speak" || route.startsWith("voice/") || route.startsWith("host-voice/") || route.startsWith("project") || route.startsWith("library") || route=="tasks" || route.startsWith("audiobook") || route.startsWith("transcribe"))),onClick={dismissKeyboard();nav.navigate(tab) {popUpTo(nav.graph.startDestinationId) {saveState=true};launchSingleTop=true;restoreState=tab!="home"}},
                             icon={Icon(when(tab) {"home" -> Icons.Default.Home;"speak" -> Icons.Default.PlayArrow;"voices" -> Icons.Default.Person;"dub" -> Icons.AutoMirrored.Filled.List;"dictate" -> Icons.Default.Edit;"connect" -> Icons.Default.Add;else -> Icons.Default.Settings},contentDescription=label)},
-                            label=if(LocalDensity.current.fontScale<=1.5f) {{Text(label)}} else null,
+                            label=if(LocalDensity.current.fontScale<=1.5f) {{Text(label,maxLines=1,softWrap=false,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)}} else null,
                             colors=NavigationBarItemDefaults.colors(indicatorColor=role("messageSurface"),selectedIconColor=role("messageAction"),selectedTextColor=role("toolbarForeground"),unselectedIconColor=role("textMuted"),unselectedTextColor=role("textMuted")))
                     }
                 }

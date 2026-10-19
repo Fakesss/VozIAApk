@@ -177,6 +177,10 @@
   "local": {
    "system_tts_unavailable": "Nenhum mecanismo de voz está instalado neste celular. Instale um (por exemplo, Serviços de fala do Google) ou baixe um modelo do VoiceStudio.",
    "system_tts_language": "O mecanismo de voz do celular não tem voz para este idioma. Escolha outro idioma ou um modelo do VoiceStudio."
+  },
+  "tabs": {
+   "settings": "Ajustes",
+   "dub": "Dublar"
   }
  }
 }

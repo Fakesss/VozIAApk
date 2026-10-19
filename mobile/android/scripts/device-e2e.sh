@@ -80,6 +80,14 @@ instrument persist-restart com.voicestudio.mobile.VoziaPersistenceTest; result "
 adb shell am start -W -n $PKG/com.voicestudio.mobile.MainActivity > /dev/null 2>&1; sleep 4; adb exec-out screencap -p > "$OUT/12-reopened.png"
 
 if [[ $FULL == true ]]; then
+    # 10. Low storage: fill /data, leaving about 3 MB, then check every write path; always remove the filler.
+    free_kb=$(adb shell df /data | awk 'NR==2 {print $4}' | tr -d '\r')
+    fill=$(( free_kb * 1024 - 3 * 1024 * 1024 ))
+    adb shell fallocate -l "$fill" /data/local/tmp/vozia-filler > "$OUT/filler.txt" 2>&1
+    adb shell df /data >> "$OUT/filler.txt" 2>&1
+    instrument low-space com.voicestudio.mobile.VoziaLowSpaceTest -e lowSpace true; code=$?
+    adb shell rm -f /data/local/tmp/vozia-filler
+    result "10. Low storage refuses downloads, library writes and exports with a clear message" $code
     adb reboot; wait_boot
     instrument persist-reboot com.voicestudio.mobile.VoziaPersistenceTest; result "9. Data persists after rebooting the device" $?
     before=$(adb shell dumpsys package $PKG | grep -m1 versionCode | tr -d '\r' | xargs)

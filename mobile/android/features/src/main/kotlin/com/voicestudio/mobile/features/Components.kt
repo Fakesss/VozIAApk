@@ -246,6 +246,12 @@ fun languageName(code: String, locale: String): String = Locale.forLanguageTag(c
 
 fun actionIcon(key: String): ImageVector = when {
     key.contains("scan_qr") -> VSIcons.Qr
+    key.startsWith("vozia.") && (key.contains("folder") || key.endsWith(".files") || key.endsWith(".open") && key.contains("audiobook")) -> VSIcons.Folder
+    key.startsWith("vozia.") && (key.contains("clean")) -> Icons.Default.Delete
+    key.startsWith("vozia.") && (key.endsWith(".new") || key.contains("create") || key.contains("import") || key.endsWith(".split")) -> Icons.Default.Add
+    key.startsWith("vozia.") && (key.contains("rename") || key.contains("save_as") || key.endsWith(".copy")) -> Icons.Default.Edit
+    key.startsWith("vozia.") && key.contains("export.open") -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+    key.startsWith("vozia.") && key.contains("regenerate") -> Icons.Default.Refresh
     key.contains("clone")||key.contains("pick") -> Icons.Default.Add
     key.contains("cancel")||key.contains("abort")||key.contains("stop") -> Icons.Default.Close
     key.contains("record") -> VSIcons.Mic
@@ -295,6 +301,8 @@ fun shortErrorKey(key: String): String = when {
 
 /** Semantic icons shared by settings and full-width picker rows. */
 fun rowIcon(key: String): ImageVector = when {
+    key.contains("library") || key.contains("export_folder") || key.contains("destination") -> VSIcons.Folder
+    key.startsWith("vozia.task") -> Icons.Default.Refresh
     key.contains("connect") || key.contains("host") -> VSIcons.Link
     key.contains("model") -> VSIcons.Download
     key.endsWith("mode") -> VSIcons.Contrast

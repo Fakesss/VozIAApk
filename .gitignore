@@ -8,3 +8,4 @@ local.properties
 /release-keys/
 *.jks
 !mobile/android/keystore/debug.keystore
+/dist-release/
