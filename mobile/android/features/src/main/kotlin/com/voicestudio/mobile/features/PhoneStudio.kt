@@ -16,7 +16,7 @@ data class PhoneState(val models: List<PhoneModel> = emptyList(), val installed:
     /** Voice creation progress; separate from speech so a long speech task never blocks creating a voice. */
     val cloneProgress: Float? = null, val cloneWaiting: Boolean = false,
     /** True when [audio] was opened by a ▶ tap (play it now), false for a fresh generation result. */
-    val autoPlay: Boolean = false, val submitting: Boolean = false) {
+    val autoPlay: Boolean = false, val submitting: Boolean = false, val playRequest: Long = 0) {
     fun canRun(model: PhoneModel, ramBytes: Long): Boolean = model.id in installed&&model.fits(ramBytes)&&accepted(model)
     fun accepted(model: PhoneModel): Boolean = !model.gated || receipts[model.id]?.lastOrNull()?.let {it.accepted&&it.fingerprint==model.licence.termsFingerprint}==true
     val speaking: TaskRecord? get() = tasks.firstOrNull {it.id==speechTask}
@@ -81,21 +81,24 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
         // The task Speak follows survives process death: it is kept in settings until it ends.
         if(mutable.value.speechTask==null) library.setting(SPEAK_TASK)?.let {id -> if(tasks.any {it.id==id&&it.active}) mutable.update {it.copy(speechTask=id)}}
         val tracked=mutable.value.speechTask ?: return
-        val speaking=tasks.firstOrNull {it.id==tracked}
-        if(speaking==null) {mutable.update {it.copy(speechTask=null,progress=null)};library.putSetting(SPEAK_TASK,null);return}
+        // `tasks` was read before suspending: a task started meanwhile may be missing from it.
+        val speaking=tasks.firstOrNull {it.id==tracked} ?: library.task(tracked)
+        // Every change below applies only if Speak still follows the same task.
+        fun release(change: (PhoneState)->PhoneState = {it}) = mutable.update {if(it.speechTask==tracked) change(it.copy(speechTask=null,progress=null)) else it}
+        suspend fun forget() {if(library.setting(SPEAK_TASK)==tracked) library.putSetting(SPEAK_TASK,null)}
+        if(speaking==null) {release();forget();return}
         when(speaking.state) {
             TaskState.SUCCEEDED -> {
                 val item=speaking.resultItem?.let {library.item(it)}
-                mutable.update {it.copy(speechTask=null,progress=null,audioItem=item,audio=item?.let(library::file),autoPlay=false)}
-                library.putSetting(SPEAK_TASK,null)
+                release {it.copy(audioItem=item,audio=item?.let(library::file),autoPlay=false)}
+                forget()
             }
             TaskState.FAILED -> {
-                mutable.update {it.copy(speechTask=null,progress=null)}
-                library.putSetting(SPEAK_TASK,null)
+                release();forget()
                 failure(ClientFailure(speaking.error ?: "vozia.task.failed",errorParams(speaking.errorParams)))
             }
-            TaskState.CANCELLED -> {mutable.update {it.copy(speechTask=null,progress=null)};library.putSetting(SPEAK_TASK,null)}
-            else -> mutable.update {it.copy(progress=speaking.progress)}
+            TaskState.CANCELLED -> {release();forget()}
+            else -> mutable.update {if(it.speechTask==tracked) it.copy(progress=speaking.progress) else it}
         }
     }
     fun download(model: PhoneModel, allowMobile: Boolean) {
@@ -109,12 +112,12 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
     }
     fun cancelDownload(model: PhoneModel) {jobs[model.id]?.cancel()}
     fun delete(model: PhoneModel) {scope.launch {
-        try {jobs[model.id]?.cancelAndJoin();cancelInference();downloads.delete(model);refresh()}
+        try {jobs[model.id]?.cancelAndJoin();cancelInference(model.id);downloads.delete(model);refresh()}
         catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}
     }}
     fun accept(model: PhoneModel, accepted: Boolean, fingerprint: String, completed: (Boolean)->Unit = {}) {scope.launch {
         try {
-            if(!accepted) {jobs[model.id]?.cancelAndJoin();cancelInference()}
+            if(!accepted) {jobs[model.id]?.cancelAndJoin();cancelInference(model.id)}
             withContext(Dispatchers.IO) {licence.record(model,accepted,fingerprint)};refresh();completed(true)
         } catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e);completed(false)}
     }}
@@ -144,13 +147,18 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
         val task=mutable.value.speechTask ?: return
         scope.launch {LibraryWorker.cancel(application,library,task);library.putSetting(SPEAK_TASK,null);mutable.update {it.copy(speechTask=null,progress=null)}}
     }
-    fun play(item: LibraryItem) {mutable.update {it.copy(audio=library.file(item),audioItem=item,autoPlay=true)}}
+    /** A ▶ tap: show [item]'s player and start it once (see [takePlay]). */
+    fun play(item: LibraryItem) {mutable.update {it.copy(audio=library.file(item),audioItem=item,autoPlay=true,playRequest=it.playRequest+1)}}
+    private var consumedPlay=0L
+    /** True for the first player that asks about [request]: one tap plays once, not on every later screen. */
+    fun takePlay(request: Long): Boolean = synchronized(this) {(request>consumedPlay).also {if(it) consumedPlay=request}}
     fun deleteGeneration(item: LibraryItem) {scope.launch {
         try {library.deleteItem(item.id);mutable.update {it.copy(audio=it.audio.takeUnless {_ -> it.audioItem?.id==item.id},audioItem=it.audioItem?.takeUnless {current -> current.id==item.id})}}
         catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}
     }}
     fun clone(name: String, file: File, model: PhoneModel, consent: Boolean, created: ()->Unit = {}) {
         if(inference?.isActive==true) return
+        cloneModel=model.id
         inference=scope.launch {
             mutable.update {it.copy(cloneProgress=0f)}
             try {
@@ -160,7 +168,7 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
                 refresh();withContext(Dispatchers.IO) {file.delete()};created()
             }
             catch(e:CancellationException) {throw e} catch(e:Exception) {retryFailure(e) {clone(name,file,model,consent,created)}}
-            finally {mutable.update {it.copy(cloneProgress=null,cloneWaiting=false)}}
+            finally {mutable.update {it.copy(cloneProgress=null,cloneWaiting=false)};cloneModel=null}
         }
     }
     fun renameVoice(voice: PhoneVoice, name: String) {scope.launch {try {voices.rename(voice,name);refresh()} catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}}}
@@ -169,8 +177,9 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
         try {val records=dubs.list();mutable.update {it.copy(dubs=records)}}
         catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}
     }}
-    /** Cancels screen-bound inference (voice creation); library tasks keep running. */
-    fun cancelInference() {inference?.cancel()}
+    private var cloneModel: String?=null
+    /** Cancels screen-started voice creation; with [modelId], only when it uses that model. */
+    fun cancelInference(modelId: String? = null) {if(modelId==null||modelId==cloneModel) inference?.cancel()}
     fun launch(block: suspend CoroutineScope.()->Unit) = scope.launch {
         try {block()} catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}
     }

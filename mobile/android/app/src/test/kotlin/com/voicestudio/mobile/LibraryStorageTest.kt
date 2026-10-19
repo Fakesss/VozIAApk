@@ -128,6 +128,19 @@ class LibraryStorageTest {
         assertEquals(reported.sorted(), reported)
     }
 
+    @Test fun aChunkOfOnlyEmojiIsSkippedNotFatal() = runBlocking<Unit> {
+        val library = library()
+        val project = library.createProject("P", ProjectKind.GENERAL)
+        // A long sentence fills the first chunk, so the emoji land in a chunk of their own.
+        val text = "palavra ".repeat(112).trim() + "! 🎉🎉"
+        assertTrue(splitForSynthesis(text, LibraryJobs.CHUNK).last().let { speakable(it).isBlank() })
+        val input = TaskJson.encodeToString(SpeechInput.serializer(), SpeechInput(text, "Emoji", VoiceChoice("piper-pt-br-faber")))
+        val engine = FakeEngine()
+        val result = LibraryJobs(library, engine).run(library.createTask(TaskKind.SPEECH, project.id, "Emoji", input)) { _, _ -> }
+        assertEquals(1, engine.calls)
+        assertTrue(library.verify(library.item(result.itemId!!)!!))
+    }
+
     @Test fun audiobookCreatesChaptersAndAMergedBookWithChapterMarks() = runBlocking<Unit> {
         val library = library()
         val project = library.createProject("Livro", ProjectKind.AUDIOBOOK)

@@ -78,7 +78,7 @@ class PhoneDubWorker(context: Context,params: WorkerParameters): CoroutineWorker
             return Result.success(workDataOf("job" to job,"stage" to "mobile.android.stage_done"))
         } catch(e:CancellationException) {
             // Only a user's cancel reads as cancelled; Android's stops are resumed by WorkManager.
-            val cancelled=Build.VERSION.SDK_INT<31||stopReason==WorkInfo.STOP_REASON_CANCELLED_BY_APP
+            @android.annotation.SuppressLint("NewApi") val cancelled=stopReason==WorkInfo.STOP_REASON_CANCELLED_BY_APP
             withContext(NonCancellable) {runCatching {val checkpoint=jobs.checkpoint(job);if(!checkpoint.done&&cancelled) jobs.save(job,checkpoint.copy(stage="mobile.simple.cancelled"))}}
             throw e
         } catch(e:Exception) {

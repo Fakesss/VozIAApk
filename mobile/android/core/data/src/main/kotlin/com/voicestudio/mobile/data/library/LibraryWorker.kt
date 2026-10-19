@@ -1,6 +1,7 @@
 package com.voicestudio.mobile.data.library
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -67,9 +68,16 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val task = library.task(taskId) ?: return Result.failure()
         if (!task.active) return Result.success()
         title = task.title
-        // Each start counts, including restarts after the process died; a task that keeps
-        // killing the app (a native crash, memory) fails with a message instead of looping.
-        if (runAttemptCount >= MAX_ATTEMPTS) {
+        // A run that ended with the process (a native crash, the system killing the app) leaves
+        // the row RUNNING, or "resuming" after recover(). Counting those starts without progress
+        // in between lets a task that keeps killing the app fail with a message instead of
+        // looping; ordinary stops by Android write "interrupted" and do not count.
+        val strikesFile = File(library.taskDirectory(taskId), "crash-strikes")
+        val died = task.state == TaskState.RUNNING || task.stage == "vozia.task.resuming"
+        val previous = runCatching { strikesFile.readText().split(' ').let { it[0].toInt() to it[1].toFloat() } }.getOrDefault(0 to 0f)
+        val strikes = if (!died) 0 else if (task.progress > previous.second + 0.001f) 1 else previous.first + 1
+        runCatching { strikesFile.parentFile?.mkdirs(); strikesFile.writeText("$strikes ${task.progress}") }
+        if (strikes >= MAX_CRASHES) {
             library.updateTask(taskId, state = TaskState.FAILED, stage = "vozia.task.failed", error = "vozia.task.too_many_attempts")
             notifyFinished(failed = true)
             return Result.failure(workDataOf(KEY_TASK to taskId, "error" to "vozia.task.too_many_attempts"))
@@ -104,7 +112,8 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         } catch (e: CancellationException) {
             withContext(NonCancellable) {
                 // The notification's Cancel action stops the work directly; record it as a cancel, not a pause.
-                val reason = if (Build.VERSION.SDK_INT >= 31) stopReason else WorkInfo.STOP_REASON_NOT_STOPPED
+                // WorkManager tracks the stop reason itself, so it is valid below API 31 too.
+                @SuppressLint("NewApi") val reason = stopReason
                 when {
                     library.task(taskId)?.state == TaskState.CANCELLED -> {}
                     reason == WorkInfo.STOP_REASON_CANCELLED_BY_APP -> library.updateTask(taskId, state = TaskState.CANCELLED, stage = "vozia.task.cancelled")
@@ -136,7 +145,7 @@ class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         /** Launch-intent extra naming the screen to open (MainActivity reads it). */
         const val ROUTE_EXTRA = "vozia.route"
         private const val CHANNEL = "library-tasks"
-        private const val MAX_ATTEMPTS = 6
+        private const val MAX_CRASHES = 4
         private fun unique(taskId: String) = "library:$taskId"
 
         /** One task runs at a time; native inference is serialized anyway and this bounds memory. */

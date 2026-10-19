@@ -21,6 +21,8 @@ class SpeechTextTest {
         assertEquals("é © fim".replace("©", "").replace("  ", " "), speakable("é © fim"))
         assertEquals("", speakable("😀 🎉"))
         assertEquals("linha 1\nlinha 2", speakable("linha 1\nlinha 2"))
+        // Degrees, the numero sign and the minus sign are read by espeak: keep them.
+        assertEquals("Hoje faz -5 °C, 30°C e 86°F; № 3", speakable("Hoje faz −5 °C, 30℃ e 86℉; № 3"))
     }
 
     @Test fun kokoroLanguagesMapToEspeakVoices() {

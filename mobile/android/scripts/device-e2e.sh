@@ -17,7 +17,7 @@ result() { if [[ $2 == 0 ]]; then log "- ✅ $1"; else log "- ❌ $1"; failures=
 instrument() { # name class [extra args...]
     local name=$1 class=$2; shift 2
     adb shell am instrument -w -r -e class "$class" "$@" "$RUNNER" > "$OUT/$name.txt" 2>&1
-    grep -h "vozia\.[a-z_]*=" "$OUT/$name.txt" | sed 's/^INSTRUMENTATION_STATUS: /    /' | sort -u >> "$SUMMARY"
+    grep -h "vozia\.[A-Za-z0-9_.-]*=" "$OUT/$name.txt" | sed 's/^INSTRUMENTATION_STATUS: /    /' | sort -u >> "$SUMMARY"
     if grep -q "^OK (" "$OUT/$name.txt" && ! grep -qE "FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed" "$OUT/$name.txt"; then return 0; fi
     sed -n '/There w/,/^INSTRUMENTATION_CODE/p' "$OUT/$name.txt" | head -60 >> "$SUMMARY"; return 1
 }

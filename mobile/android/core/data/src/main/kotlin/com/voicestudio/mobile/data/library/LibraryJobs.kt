@@ -188,7 +188,11 @@ class LibraryJobs(private val library: Library, private val engine: JobEngine) {
     private suspend fun synthesizeText(text: String, choice: VoiceChoice, directory: File, progress: suspend (Float) -> Unit): Rendered {
         // Cloned voices run OmniVoice, which is slow on phones: shorter chunks keep
         // progress moving and make each checkpoint cheaper to redo after a stop.
-        val chunks = splitForSynthesis(text, if (choice.voice != null) CLONE_CHUNK else CHUNK)
+        val split = splitForSynthesis(text, if (choice.voice != null) CLONE_CHUNK else CHUNK)
+        // A chunk of only emoji or symbols has nothing for a sherpa voice to read: skip it
+        // instead of failing the whole task (the system voice and OmniVoice read raw text).
+        val native = choice.voice == null && !engine.model(choice.model).system
+        val chunks = if (native) split.filter { speakable(it).isNotBlank() } else split
         if (chunks.isEmpty()) throw ClientFailure("vozia.task.empty_text")
         directory.mkdirs()
         val identity = File(directory, "choice.json")

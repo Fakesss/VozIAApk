@@ -163,7 +163,7 @@ fun preferredLanguage(languages: List<String>, device: String): String? {
         Heading("mobile.speak.recent")
         if(phone.recent.isEmpty()) EmptyState("mobile.simple.empty_recent")
         var deleting by remember {mutableStateOf<com.voicestudio.mobile.data.library.LibraryItem?>(null)}
-        phone.recent.forEach {item ->
+        phone.recent.forEach {item -> key(item.id) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(item.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -174,8 +174,11 @@ fun preferredLanguage(languages: List<String>, device: String): String? {
                 IconAction("common.delete",Icons.Default.Delete) {deleting=item}
             }
             // ▶ plays right here, under the row that was tapped.
-            if(phone.autoPlay&&phone.audioItem?.id==item.id) phone.audio?.let {file -> LocalAudioPlayer(file,vm::fail,autoPlay=true)}
-        }
+            if(phone.autoPlay&&phone.audioItem?.id==item.id) phone.audio?.let {file ->
+                val start=remember(phone.playRequest) {vm.phone.takePlay(phone.playRequest)}
+                LocalAudioPlayer(file,vm::fail,autoPlay=start)
+            }
+        }}
         deleting?.let {item ->
             AlertDialog(onDismissRequest={deleting=null},title={Text(tr("vozia.item.delete_title"))},text={Text(item.title)},
                 confirmButton={TextButton(onClick={deleting=null;vm.phone.deleteGeneration(item)}) {Text(tr("common.delete"),color=role("error"))}},

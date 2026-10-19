@@ -301,8 +301,12 @@ fun speakable(text: String): String {
         when {
             cp in setOf(0x201C,0x201D,0x201E,0x201F,0x00AB,0x00BB,0x2033,0x301D,0x301E) -> out.append('"')
             cp in setOf(0x2018,0x2019,0x201A,0x201B,0x2039,0x203A,0x2032,0x00B4,0x0060) -> out.append('\'')
-            cp in setOf(0x2013,0x2014,0x2015,0x2212) -> out.append(", ")
-            cp in setOf(0x2010,0x2011,0x2012) -> out.append('-')
+            cp in setOf(0x2013,0x2014,0x2015) -> out.append(", ")
+            cp in setOf(0x2010,0x2011,0x2012,0x2212) -> out.append('-')
+            // Symbols espeak's dictionaries read aloud ("graus", "número") stay.
+            cp==0x2103 -> out.append("°C")
+            cp==0x2109 -> out.append("°F")
+            cp==0x00B0||cp==0x2116 -> out.appendCodePoint(cp)
             cp==0x2026 -> out.append("...")
             cp in setOf(0x00A0,0x2007,0x202F,0x2009,0x200A,0x3000) -> out.append(' ')
             cp in setOf(0x00B9,0x00B2,0x00B3) -> out.append(when(cp) {0x00B9 -> '1';0x00B2 -> '2';else -> '3'})

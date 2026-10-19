@@ -123,7 +123,7 @@ import com.voicestudio.mobile.local.*
                 if(LocalDensity.current.fontScale<=1.5f) Text(tr("mobile.local.run_on"),style=MaterialTheme.typography.labelSmall)
                 SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
                     listOf("phone" to "mobile.local.this_phone","computer" to "mobile.simple.computer").forEachIndexed {index,(id,key) ->
-                        SegmentedButton(selected=(location==RunLocation.COMPUTER)==(id=="computer"),onClick={vm.phone.cancelInference();vm.preference {it.copy(runLocations=it.runLocations+(task to id))}},shape=SegmentedButtonDefaults.itemShape(index,2)) {Text(tr(key),maxLines=1,overflow=TextOverflow.Ellipsis)}
+                        SegmentedButton(selected=(location==RunLocation.COMPUTER)==(id=="computer"),onClick={if(task=="clone") vm.phone.cancelInference();vm.preference {it.copy(runLocations=it.runLocations+(task to id))}},shape=SegmentedButtonDefaults.itemShape(index,2)) {Text(tr(key),maxLines=1,overflow=TextOverflow.Ellipsis)}
                     }
                 }
         }
@@ -137,7 +137,7 @@ import com.voicestudio.mobile.local.*
         Choice(it.id,if(it.system) tr("vozia.engine.system") else it.name,enabled=it.fits(vm.phone.ramBytes),
             supporting=if(it.system) tr("vozia.engine.system_detail") else if(!it.fits(vm.phone.ramBytes)) tr("mobile.local.ram_required",mapOf("ram" to it.minRamGb))
                 else if(it.id in phone.installed) tr("mobile.local.installed") else tr("vozia.engine.download_size",mapOf("size" to android.text.format.Formatter.formatFileSize(LocalContext.current,it.archive?.size ?: it.totalBytes))))
-    },compact=compact) {id -> vm.phone.cancelInference();vm.preference {it.copy(phoneModels=it.phoneModels+(task to id))}}
+    },compact=compact) {id -> if(task=="clone") vm.phone.cancelInference();vm.preference {it.copy(phoneModels=it.phoneModels+(task to id))}}
 }
 
 /** One explicit Get action starts the dependency list; each gated model keeps its own sheet. */

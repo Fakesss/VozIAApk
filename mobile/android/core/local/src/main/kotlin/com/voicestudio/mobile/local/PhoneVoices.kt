@@ -51,8 +51,11 @@ class PhoneVoiceStore(private val root: File) {
             // sample makes each one slower. Keep the first ~12 s, cut at a pause, and
             // transcribe exactly that part so text and audio still match.
             val full=decoded.read(0,decoded.frames.toInt())
-            val end=speechWindows(full.samples,full.sampleRate,REFERENCE_SECONDS,3).first().second
-            val reference=if(end<full.samples.size) LocalAudio(full.samples.copyOf(end),full.sampleRate).also {writePcm(it,File(dir,"reference.pcm"))} else full
+            val rate=full.sampleRate
+            // Start just before the first speech, so an intro of silence or music is skipped.
+            val onset=((voicedSpan(full.samples,0,full.samples.size,rate)?.first ?: 0)-rate/5).coerceAtLeast(0)
+            val end=onset+speechWindows(full.samples.copyOfRange(onset,full.samples.size),rate,REFERENCE_SECONDS,3).first().second
+            val reference=if(onset>0||end<full.samples.size) LocalAudio(full.samples.copyOfRange(onset,end),rate).also {writePcm(it,File(dir,"reference.pcm"))} else full
             val transcript=engine.transcribe(asr,reference) {progress(.25f+it*.7f)}.trim()
             if(transcript.isEmpty()) throw ClientFailure("mobile.simple.no_speech")
             writeReferenceWave(reference,File(dir,"reference.wav"))

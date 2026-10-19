@@ -48,6 +48,10 @@ import java.io.File
     var preview by remember {mutableStateOf<String?>(null)}
     val recorder=remember {SampleRecorder(context)}
     LaunchedEffect(Unit) {sample?.let {if(!File(it).exists()) sample=null}}
+    // A voice created while this screen was away consumed the sample: reset the form.
+    LaunchedEffect(phone.cloneProgress) {
+        if(phone.cloneProgress==null&&sample?.let {!File(it).exists()}==true) {sample=null;name="";permission=false;cloning=false}
+    }
     DisposableEffect(lifecycle) {
         // A recording stops with the screen; a voice already being created finishes in the background
         // (it only transcribes the sample) and deletes the sample itself.
