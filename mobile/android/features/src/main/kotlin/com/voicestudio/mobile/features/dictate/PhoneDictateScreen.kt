@@ -34,9 +34,10 @@ internal class PhoneDictation(private val engine: LocalEngine, private val scope
     val active=mutableActive.asStateFlow()
     @Volatile private var recording=false
     private var capture: Job?=null
-    fun start(model: PhoneModel) {
+    fun start(model: PhoneModel, language: String? = null) {
         if(mutableActive.value) return
         mutableActive.value=true;mutableText.value="";recording=true
+        if(model.capability=="asr") {capture=scope.launch {whisper(model,language)};return}
         capture=scope.launch {
             try {
                 val samples=channelFlow {
@@ -51,8 +52,48 @@ internal class PhoneDictation(private val engine: LocalEngine, private val scope
             finally {recording=false;mutableActive.value=false}
         }
     }
+    /**
+     * Whisper is not a streaming model, so speech is cut at pauses (or every 15 s) and
+     * each phrase is transcribed on the phone while recording continues. This is what
+     * makes dictation work in Portuguese and Whisper's other languages.
+     */
+    private suspend fun whisper(model: PhoneModel, language: String?) = coroutineScope {
+        val phrases=kotlinx.coroutines.channels.Channel<FloatArray>(8)
+        val decoder=launch {
+            for(phrase in phrases) {
+                val text=engine.transcribeSegments(model,LocalAudio(phrase,16000),language).joinToString(" ") {it.text.trim()}.trim()
+                if(text.isNotEmpty()) mutableText.value=listOf(mutableText.value,text).filter {it.isNotBlank()}.joinToString(" ")
+            }
+        }
+        val segmenter=PhraseSegmenter(16000)
+        try {
+            microphone.record({recording}) {buffer,n ->
+                val pcm=ByteBuffer.wrap(buffer,0,n).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                segmenter.accept(FloatArray(n/2) {pcm.get().toFloat()/32768f})?.let {if(!phrases.trySend(it).isSuccess) throw ClientFailure("mobile.local.capture_slow")}
+            }
+            segmenter.flush()?.let {phrases.send(it)}
+            phrases.close();decoder.join()
+        } catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}
+        finally {phrases.close();recording=false;mutableActive.value=false}
+    }
     fun finish() {recording=false}
     override fun close() {recording=false;capture?.cancel()}
+}
+
+/** Energy-based pauses split speech into phrases of at least 0.6 s and at most 15 s. */
+internal class PhraseSegmenter(private val rate: Int, private val pause: Double = .7, private val longest: Double = 15.0, private val threshold: Float = .012f) {
+    private val buffer=ArrayList<Float>(rate*16)
+    private var silent=0;private var voiced=0
+    fun accept(samples: FloatArray): FloatArray? {
+        val energy=kotlin.math.sqrt(samples.fold(0.0) {a,s -> a+s*s}/samples.size.coerceAtLeast(1)).toFloat()
+        if(energy>=threshold) {voiced+=samples.size;silent=0} else silent+=samples.size
+        if(voiced==0&&energy<threshold) return null
+        samples.forEach(buffer::add)
+        val cut=(silent>=pause*rate&&voiced>=.6*rate)||buffer.size>=longest*rate
+        return if(cut) take() else null
+    }
+    fun flush(): FloatArray? = if(voiced>=.3*rate) take() else null
+    private fun take(): FloatArray {val result=buffer.toFloatArray();buffer.clear();silent=0;voiced=0;return result}
 }
 
 @Composable internal fun PhoneDictateScreen(vm: StudioViewModel, model: PhoneModel?, ready: Boolean) {
@@ -68,10 +109,14 @@ internal class PhoneDictation(private val engine: LocalEngine, private val scope
         onDispose {lifecycle.lifecycle.removeObserver(observer);controller.close()}
     }
     var holding by remember {mutableStateOf(false)}
-    val start=permissionAction(Manifest.permission.RECORD_AUDIO,"mobile.permissions.microphone",vm::fail) {if(ready&&model!=null) controller.start(model)}
-    val holdStart=permissionAction(Manifest.permission.RECORD_AUDIO,"mobile.permissions.microphone",vm::fail) {if(holding&&ready&&model!=null) controller.start(model)}
+    // Whisper takes the app language ("pt", "en", ...); the streaming Zipformer model is English only.
+    val language=LocalL10n.current.locale.substringBefore('-').lowercase().takeIf {model?.capability=="asr"&&it.matches(Regex("[a-z]{2}"))}
+    val start=permissionAction(Manifest.permission.RECORD_AUDIO,"mobile.permissions.microphone",vm::fail) {if(ready&&model!=null) controller.start(model,language)}
+    val holdStart=permissionAction(Manifest.permission.RECORD_AUDIO,"mobile.permissions.microphone",vm::fail) {if(holding&&ready&&model!=null) controller.start(model,language)}
     DictationLayout(content={
         ScreenTitle("mobile.tabs.dictate")
+        com.voicestudio.mobile.features.models.TaskModelPicker(vm,"dictate",setOf("asr-stream","asr"),model)
+        if(model?.capability=="asr-stream") Text(tr("vozia.dictate.english_only"),style=MaterialTheme.typography.bodySmall,color=role("textMuted"))
         if(!ready) model?.let {MissingModelsCard(vm,"mobile.tabs.dictate",listOf(it))}
         Text(text,modifier=Modifier.fillMaxWidth().heightIn(min=VSTheme.touchTarget*3).semantics {liveRegion=LiveRegionMode.Polite})
     }, controls={

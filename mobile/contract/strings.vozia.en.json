@@ -168,6 +168,9 @@
    "export_folder_clear": "Forget export folder",
    "clean_temp": "Delete temporary files",
    "cleaned": "Freed {{size}}"
+  },
+  "dictate": {
+   "english_only": "The streaming English model shows words as you speak. For Portuguese and other languages choose Whisper: each phrase appears after a short pause."
   }
  },
  "mobile": {

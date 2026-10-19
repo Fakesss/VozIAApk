@@ -168,6 +168,9 @@
    "export_folder_clear": "Esquecer pasta de exportação",
    "clean_temp": "Apagar arquivos temporários",
    "cleaned": "Liberado: {{size}}"
+  },
+  "dictate": {
+   "english_only": "O modelo de streaming é só em inglês e mostra as palavras enquanto você fala. Para português e outros idiomas escolha o Whisper: cada frase aparece após uma pequena pausa."
   }
  },
  "mobile": {

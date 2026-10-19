@@ -27,6 +27,19 @@ wait_boot() {
     sleep 10; adb shell input keyevent 82 >/dev/null 2>&1 || true
 }
 
+if [[ $FULL == heavy ]]; then
+    # Large models: OmniVoice voice cloning and the full phone dub (Whisper, Qwen3, OmniVoice).
+    log "## Heavy models · $(adb shell getprop ro.product.model | tr -d '\r') · API $(adb shell getprop ro.build.version.sdk | tr -d '\r') · RAM $(adb shell cat /proc/meminfo | head -1 | tr -s ' ' | tr -d '\r')"
+    adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; adb install -r "$DIST/app-debug-androidTest.apk" >> "$OUT/install.txt" 2>&1
+    smoke=(-e downloadSmokeModels true -e acceptModelLicencesForSmoke true)
+    start=$(date +%s); instrument clone com.voicestudio.mobile.LocalInferenceTest#phoneVoiceUsesRealDecoderWhisperAndOmniVoice -e cloneInferenceSmoke true "${smoke[@]}"
+    result "Voice cloning with OmniVoice on the device ($(( $(date +%s) - start )) s including downloads)" $?
+    start=$(date +%s); instrument dub com.voicestudio.mobile.PhoneDubInferenceTest -e dubInferenceSmoke true "${smoke[@]}"
+    result "Phone dub: Whisper → Qwen3 translation to French → OmniVoice, muxed output ($(( $(date +%s) - start )) s)" $?
+    adb logcat -d > "$OUT/logcat.txt" 2>&1 || true
+    log ""; log "Failures: $failures"; exit $failures
+fi
+
 log "## Device $(adb shell getprop ro.product.model | tr -d '\r') · Android $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r')) · $ABI · $(adb shell wm size | tr -d '\r' | sed 's/Physical size: //') · $(adb shell wm density | tr -d '\r' | sed 's/Physical density: //') dpi"
 log ""
 adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; result "1. Install $(basename "$APP")" $?

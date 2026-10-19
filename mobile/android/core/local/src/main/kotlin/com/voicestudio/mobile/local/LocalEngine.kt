@@ -93,7 +93,7 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
                 if(!job.isActive||!models.licence.accepted(model)) 0 else {chunks++;progress((chunks.toFloat()/(chunks+1)).coerceAtMost(.95f));1}
             }
             val audio=if(type=="supertonic") tts.generateWithConfigAndCallback(text,GenerationConfig(sid=speaker,speed=speed,
-                    numSteps=model.option("num_steps","8").toIntOrNull()?.coerceIn(1,32) ?: 8,extra=mapOf("lang" to (language ?: model.languages.first()))),callback)
+                    numSteps=model.option("num_steps","8").toIntOrNull()?.coerceIn(1,32) ?: 8,extra=mapOf("lang" to (language ?: model.languages.firstOrNull {it=="en"} ?: model.languages.first()))),callback)
                 else tts.generateWithCallback(text,speaker,speed,callback)
             job.ensureActive();LocalAudio(audio.samples,audio.sampleRate)
         } finally {tts.release()}

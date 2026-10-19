@@ -57,6 +57,19 @@ jobs:
           cp app/build/outputs/bundle/release/*.aab "$RUNNER_TEMP/release/VoiceStudio-VozIA-$BUILD_NUMBER-release-unsigned.aab"
           (cd "$RUNNER_TEMP/release" && sha256sum * > SHA256SUMS.txt)
           ls -la "$RUNNER_TEMP/dist" "$RUNNER_TEMP/release"
+      - name: Signed release
+        env:
+          KEYSTORE_BASE64: ${{ secrets.VOZIA_KEYSTORE_BASE64 }}
+          VOZIA_KEYSTORE_PASSWORD: ${{ secrets.VOZIA_KEYSTORE_PASSWORD }}
+          VOZIA_KEY_ALIAS: ${{ secrets.VOZIA_KEY_ALIAS }}
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          VOZIA_KEYSTORE="$RUNNER_TEMP/release.jks" ./gradlew --console=plain -PvoziaBuild=$BUILD_NUMBER assembleRelease bundleRelease
+          for f in app/build/outputs/apk/release/app-*-release.apk; do b=$(basename "$f"); cp "$f" "$RUNNER_TEMP/release/VoiceStudio-VozIA-$BUILD_NUMBER-${b#app-}"; done
+          cp app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/release/VoiceStudio-VozIA-$BUILD_NUMBER-release.aab"
+          rm -f "$RUNNER_TEMP"/release/*-release-unsigned.aab "$RUNNER_TEMP/release.jks"
+          (cd "$RUNNER_TEMP/release" && sha256sum * > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
           name: dist
@@ -99,7 +112,7 @@ jobs:
   device:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -119,6 +132,13 @@ jobs:
             target: google_apis
             profile: pixel_tablet
             full: "false"
+          - name: api34-heavy-models
+            api: 34
+            target: google_apis
+            profile: pixel_6
+            full: heavy
+            ram: 8192M
+            disk: 16G
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -136,8 +156,8 @@ jobs:
           target: ${{ matrix.target }}
           arch: x86_64
           profile: ${{ matrix.profile }}
-          ram-size: 4096M
-          disk-size: 8G
+          ram-size: ${{ matrix.ram || '4096M' }}
+          disk-size: ${{ matrix.disk || '8G' }}
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           disable-animations: true
           script: bash mobile/android/scripts/device-e2e.sh dist device-results ${{ matrix.full }}

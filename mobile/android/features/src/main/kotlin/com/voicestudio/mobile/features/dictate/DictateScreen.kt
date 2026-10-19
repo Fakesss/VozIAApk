@@ -74,7 +74,7 @@ import kotlinx.coroutines.CancellationException
 }
 
 @Composable fun DictateScreen(vm: StudioViewModel) {
-    com.voicestudio.mobile.features.models.TaskLocation(vm,"dictate",setOf("asr-stream")) {location,model ->
+    com.voicestudio.mobile.features.models.TaskLocation(vm,"dictate",setOf("asr-stream","asr")) {location,model ->
         if(location==com.voicestudio.mobile.local.RunLocation.COMPUTER) ComputerDictateScreen(vm)
         else {
             val phone by vm.phone.state.collectAsState()

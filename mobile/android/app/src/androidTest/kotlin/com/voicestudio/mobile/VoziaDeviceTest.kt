@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import com.voicestudio.mobile.data.library.*
 import com.voicestudio.mobile.local.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
@@ -156,14 +157,13 @@ class VoziaDeviceTest {
         awaitTask(task.id, 120_000) { it.state == TaskState.RUNNING && it.progress > 0f }
         LibraryWorker.cancel(context, library, task.id)
         val finished = awaitTask(task.id, 60_000) { it.state == TaskState.CANCELLED }
-        withTimeout(60_000) {
-            while (WorkManager.getInstance(context).getWorkInfosForUniqueWork("library:${task.id}").get().any { !it.state.isFinished }) delay(200)
-        }
+        val work = WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("library:${task.id}")
+        withTimeout(60_000) { work.first { infos -> infos.all { it.state.isFinished } } }
         delay(1000)
         assertEquals(TaskState.CANCELLED, library.task(task.id)!!.state)
         assertNull(finished.resultItem)
         assertEquals("no partial result was saved", before, library.items(project.id).size)
-        assertEquals(WorkInfo.State.CANCELLED, WorkManager.getInstance(context).getWorkInfosForUniqueWork("library:${task.id}").get().single().state)
+        assertEquals(WorkInfo.State.CANCELLED, work.first().single().state)
     }
 
     @Test fun f_missingModelFailsWithAClearError() = runBlocking<Unit> {
