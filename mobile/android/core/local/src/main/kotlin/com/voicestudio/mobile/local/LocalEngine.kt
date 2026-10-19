@@ -67,7 +67,12 @@ class EngineWait(val waiting: suspend (Boolean)->Unit): kotlin.coroutines.Abstra
     companion object Key: kotlin.coroutines.CoroutineContext.Key<EngineWait>
 }
 
-class PhoneLocalEngine(private val models: ModelDownloads, private val system: SystemSpeech? = null): LocalEngine {
+/**
+ * [catalogue] lists every known model, so the shared espeak-ng folder covers all installed
+ * voices; [seedEspeak] adds bundled espeak files to it.
+ */
+class PhoneLocalEngine(private val models: ModelDownloads, private val system: SystemSpeech? = null,
+    private val catalogue: ()->List<PhoneModel> = {emptyList()}, private val seedEspeak: (File)->Unit = {}): LocalEngine {
     companion object {
         // One large GGUF model (OmniVoice, llama.cpp) and one small ONNX model run at a
         // time: a slow clone or dub no longer holds up ordinary speech or transcription,
@@ -111,9 +116,11 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
         }
         return synthesizeNative(model,text,speaker,speed,language,progress)
     }
-    private suspend fun synthesizeNative(model: PhoneModel, text: String, speaker: Int, speed: Float, language: String?, progress: (Float)->Unit): LocalAudio = execute(model,"tts",progress) {dir,job ->
-        require(text.isNotBlank() && text.length<=20000 && speed in .5f..2f && (language==null||language in model.languages))
-        val dataDir=dataDirectory(model,dir)
+    private suspend fun synthesizeNative(model: PhoneModel, raw: String, speaker: Int, speed: Float, language: String?, progress: (Float)->Unit): LocalAudio = execute(model,"tts",progress) {dir,job ->
+        require(raw.isNotBlank() && raw.length<=20000 && speed in .5f..2f && (language==null||language in model.languages))
+        val text=speakable(raw).ifBlank {throw ClientFailure("vozia.task.empty_text")}
+        // espeak-ng keeps the first data folder it is given for the whole process: always pass the shared one.
+        val dataDir=if(dataDirectory(model,dir).isEmpty()) "" else models.sharedEspeak(catalogue()+model,seedEspeak).path
         val config=OfflineTtsModelConfig(numThreads=inferenceThreads(model),provider="cpu")
         val type=model.option("model_type",model.option("type",if(model.id.contains("kitten")) "kitten" else "kokoro"))
         when(type) {
@@ -124,10 +131,12 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
                 unicodeIndexer=model.role(dir,"unicode-indexer"),voiceStyle=model.role(dir,"voices"))
             "kitten" -> config.kitten=OfflineTtsKittenModelConfig(model=model.role(dir,"model"),voices=model.role(dir,"voices"),tokens=model.role(dir,"tokens"),dataDir=dataDir)
             "kokoro" -> config.kokoro=OfflineTtsKokoroModelConfig(model=model.role(dir,"model"),voices=model.role(dir,"voices"),tokens=model.role(dir,"tokens"),dataDir=dataDir,
-                lexicon=model.files.filter {it.role=="lexicon"}.joinToString(",") {File(dir,it.path).absolutePath},lang=language ?: model.option("lang"),dictDir=model.role(dir,"dict"))
+                lexicon=model.files.filter {it.role=="lexicon"}.joinToString(",") {File(dir,it.path).absolutePath},lang=espeakVoice(language ?: model.option("lang")),dictDir=model.role(dir,"dict"))
             else -> throw ClientFailure("mobile.local.model_incompatible")
         }
-        val tts=OfflineTts(config=OfflineTtsConfig(model=config,maxNumSentences=1,ruleFsts=model.files.filter {it.role=="rule-fst"}.joinToString(",") {File(dir,it.path).absolutePath}))
+        // Kokoro's rule FSTs rewrite numbers and dates as Chinese: apply them to Chinese text only.
+        val chinese=type!="kokoro"||(language ?: model.option("lang")).lowercase().let {it.startsWith("zh")||it.startsWith("cmn")}
+        val tts=OfflineTts(config=OfflineTtsConfig(model=config,maxNumSentences=1,ruleFsts=if(!chinese) "" else model.files.filter {it.role=="rule-fst"}.joinToString(",") {File(dir,it.path).absolutePath}))
         try {
             if(speaker !in 0 until tts.numSpeakers()) throw ClientFailure("mobile.local.model_incompatible")
             var chunks=0
@@ -152,8 +161,13 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
                 tokens=model.role(dir,"tokens"),numThreads=2,provider="cpu")))
         try {
             val segments=mutableListOf<SpeechSegment>()
-            for((start,limit) in speechWindows(audio.samples,audio.sampleRate)) {
+            // Phrase-sized windows cut at pauses. The catalogue Whisper models have no token
+            // timestamps, so each window's speech bounds come from its loudness instead;
+            // silent windows are skipped (Whisper invents text for silence).
+            for((start,limit) in speechWindows(audio.samples,audio.sampleRate,SEGMENT_SECONDS,3)) {
                 job.ensureActive();models.licence.requireAccepted(model)
+                val voiced=voicedSpan(audio.samples,start,limit,audio.sampleRate)
+                if(voiced==null) {progress(limit.toFloat()/audio.samples.size);continue}
                 val stream=recognizer.createStream()
                 try {
                     stream.acceptWaveform(audio.samples.copyOfRange(start,limit),audio.sampleRate);recognizer.decode(stream)
@@ -162,10 +176,12 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
                     if(text.isNotEmpty()) {
                         val duration=(limit-start).toDouble()/audio.sampleRate
                         val valid=result.timestamps.filter {it.isFinite()&&it>=0&&it<duration}
-                        val first=(valid.minOrNull()?.toDouble() ?: 0.0).coerceIn(0.0,(duration-.02).coerceAtLeast(0.0))
+                        val loudFirst=(voiced.first-start).toDouble()/audio.sampleRate
+                        val loudEnd=(voiced.second-start).toDouble()/audio.sampleRate
+                        val first=(valid.minOrNull()?.toDouble() ?: loudFirst).coerceIn(0.0,(duration-.02).coerceAtLeast(0.0))
                         val last=valid.maxOrNull()?.toDouble()
                         val tail=result.durations.lastOrNull()?.takeIf {it.isFinite()&&it>0}?.toDouble() ?: .5
-                        val end=if(last==null) duration else (last+tail).coerceIn(minOf(first+.01,duration),duration)
+                        val end=(if(last==null) loudEnd else last+tail).coerceIn(minOf(first+.01,duration),duration)
                         val offset=start.toDouble()/audio.sampleRate
                         segments+=SpeechSegment(offset+first,offset+end,text)
                     }
@@ -238,6 +254,58 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
         return result.path
     }
 }
+/** Whisper phrase windows: short enough to time a dub line, long enough for context. */
+const val SEGMENT_SECONDS=10
+
+/**
+ * First and last sample of the loud part of samples[start, limit) (30 ms frames above
+ * -50 dBFS and a tenth of the window's peak), or null when the window is silence.
+ */
+fun voicedSpan(samples: FloatArray, start: Int, limit: Int, rate: Int): Pair<Int,Int>? {
+    val frame=(rate*3/100).coerceAtLeast(1)
+    val levels=(start until limit step frame).map {from ->
+        val to=minOf(from+frame,limit);var sum=0.0
+        for(i in from until to) sum+=samples[i]*samples[i]
+        from to kotlin.math.sqrt(sum/(to-from).coerceAtLeast(1))
+    }
+    val peak=levels.maxOfOrNull {it.second} ?: return null
+    val threshold=maxOf(.00316,peak*.1)
+    val loud=levels.filter {it.second>=threshold}
+    if(peak<.00316||loud.isEmpty()) return null
+    return loud.first().first to minOf(loud.last().first+frame,limit)
+}
+
+/**
+ * Text as sherpa's front ends can read it: NFC, typographic quotes and dashes as plain
+ * punctuation, and no emoji or other characters outside the BMP (JNI's modified UTF-8
+ * garbles them, and espeak/Kokoro choke on them).
+ */
+fun speakable(text: String): String {
+    val normal=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFC)
+    val out=StringBuilder(normal.length)
+    var i=0
+    while(i<normal.length) {
+        val cp=normal.codePointAt(i);i+=Character.charCount(cp)
+        when {
+            cp in setOf(0x201C,0x201D,0x201E,0x201F,0x00AB,0x00BB,0x2033,0x301D,0x301E) -> out.append('"')
+            cp in setOf(0x2018,0x2019,0x201A,0x201B,0x2039,0x203A,0x2032,0x00B4,0x0060) -> out.append('\'')
+            cp in setOf(0x2013,0x2014,0x2015,0x2212) -> out.append(", ")
+            cp in setOf(0x2010,0x2011,0x2012) -> out.append('-')
+            cp==0x2026 -> out.append("...")
+            cp in setOf(0x00A0,0x2007,0x202F,0x2009,0x200A,0x3000) -> out.append(' ')
+            cp in setOf(0x00B9,0x00B2,0x00B3) -> out.append(when(cp) {0x00B9 -> '1';0x00B2 -> '2';else -> '3'})
+            cp>0xFFFF||cp in 0xFE00..0xFE0F||cp in setOf(0x200B,0x200C,0x200D,0x2060,0xFEFF) -> {}
+            cp=='\n'.code||cp=='\t'.code -> out.appendCodePoint(cp)
+            Character.isISOControl(cp)||Character.getType(cp)==Character.OTHER_SYMBOL.toInt()||Character.getType(cp)==Character.PRIVATE_USE.toInt()||Character.getType(cp)==Character.SURROGATE.toInt() -> out.append(' ')
+            else -> out.appendCodePoint(cp)
+        }
+    }
+    return out.toString().replace(Regex("[ ]{2,}")," ").trim()
+}
+
+/** Catalogue language codes as espeak-ng voice names (Kokoro passes them to espeak). */
+fun espeakVoice(language: String): String = when(language.lowercase()) {"en-gb" -> "en-gb-x-rp";else -> language}
+
 /**
  * Whisper windows of at most [maxSeconds]. Each cut moves back to the quietest 30 ms
  * frame in the window's last [searchSeconds], so words are rarely split in half.

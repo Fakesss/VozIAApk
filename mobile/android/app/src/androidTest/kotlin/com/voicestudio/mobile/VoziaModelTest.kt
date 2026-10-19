@@ -64,7 +64,10 @@ class VoziaModelMatrixTest {
             try {
                 install(runtime, model)
                 val language = model.languages.firstOrNull { it.lowercase().startsWith("pt") } ?: model.languages.firstOrNull { it.lowercase().startsWith("en") } ?: model.languages.first()
-                val text = if (language.lowercase().startsWith("pt")) "Olá! Este é um teste de voz em português, gerado no celular." else "Hello! This is a voice test generated on the phone."
+                // Typographic quotes, a dash and an emoji, as pasted text has: with the Piper download's
+                // trimmed espeak data these crashed the app process before the shared espeak folder.
+                val text = if (language.lowercase().startsWith("pt")) "Olá! Ele disse “bom dia” — «teste» de voz em português, feito no celular 😀."
+                    else "Hello! She said “good morning” — a voice test made on the phone 😀."
                 val started = System.currentTimeMillis()
                 val task = awaitTask(library, speak(library, project, text, VoiceChoice(model.id, language = language), model.id).id, 10 * 60_000L)
                 val seconds = (System.currentTimeMillis() - started) / 1000.0

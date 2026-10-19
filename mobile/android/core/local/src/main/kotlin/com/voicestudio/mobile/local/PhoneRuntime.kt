@@ -17,7 +17,18 @@ class PhoneRuntime private constructor(context: Context) {
         connectivity.activeNetwork?.let {connectivity.getNetworkCapabilities(it)}?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)==true
     }
     val speech=SystemSpeech(app)
-    val engine: LocalEngine=PhoneLocalEngine(downloads,speech)
+    // English dictionary espeak falls back to for foreign characters; the Piper pt-BR download lacks it.
+    private val bundledEspeak=listOf("en_dict","lang/gmw/en","lang/gmw/en-US")
+    val engine: LocalEngine=PhoneLocalEngine(downloads,speech,{models()}) {directory ->
+        for(name in bundledEspeak) {
+            val target=File(directory,name)
+            if(target.exists()) continue
+            target.parentFile!!.mkdirs()
+            val pending=File(target.path+".tmp")
+            app.assets.open("espeak-ng-data/$name").use {input -> pending.outputStream().use {input.copyTo(it)}}
+            if(!pending.renameTo(target)) pending.delete()
+        }
+    }
     @Volatile private var catalogue: List<PhoneModel>?=null
     /** Bundled models.json plus the system voice; decoded once per process. */
     fun models(): List<PhoneModel> = catalogue ?: synchronized(this) {

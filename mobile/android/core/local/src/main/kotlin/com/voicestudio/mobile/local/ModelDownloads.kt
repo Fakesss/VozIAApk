@@ -22,6 +22,8 @@ internal fun sha256(file: File, check: ()->Unit = {}): String = file.inputStream
     while(true) {check();val n=input.read(bytes);if(n<0) break;digest.update(bytes,0,n)}
     digest.digest().joinToString("") {"%02x".format(it)}
 }
+/** Folder under the models root shared by every espeak-based voice (see [ModelDownloads.sharedEspeak]). */
+const val ESPEAK_DIRECTORY="espeak-ng-data"
 data class DownloadProgress(val received: Long = 0, val total: Long = 0, val running: Boolean = false, val error: String? = null, val extracting: Boolean = false)
 /** Dedicated public-download client never carries paired-host PINs or sessions. */
 class ModelDownloads internal constructor(
@@ -57,6 +59,32 @@ class ModelDownloads internal constructor(
         val directory=dir(model)
         File(directory,".verified").readText()==identity(model) && model.files.all {File(directory,it.path).length()==it.size}
     }.getOrDefault(false)
+    /**
+     * sherpa-onnx starts espeak-ng once per process, with the first data directory it
+     * is given, and each model ships only its own languages. So every espeak model
+     * uses this one directory: the union of the installed models' espeak-ng-data
+     * (identical files across models; each was SHA-256 checked at download) plus the
+     * files [seed] adds, such as the English dictionary espeak falls back to.
+     */
+    fun sharedEspeak(models: Collection<PhoneModel>, seed: (File)->Unit = {}): File {
+        val target=File(root,ESPEAK_DIRECTORY).canonicalFile
+        for(model in models.distinctBy {it.id}) {
+            if(model.system||!installed(model)) continue
+            for(f in model.files) {
+                val relative=f.path.substringAfter("espeak-ng-data/","").takeIf {it.isNotEmpty()} ?: continue
+                val out=File(target,relative).canonicalFile
+                if(!out.path.startsWith(target.path+File.separator)||out.length()==f.size) continue
+                val source=File(dir(model),f.path)
+                if(source.length()!=f.size) continue
+                out.parentFile!!.mkdirs()
+                val pending=File(out.path+".tmp")
+                source.copyTo(pending,overwrite=true)
+                if(!pending.renameTo(out)) pending.delete()
+            }
+        }
+        seed(target)
+        return target
+    }
     fun usedBytes(model: PhoneModel): Long = dir(model).walkTopDown().filter {it.isFile}.sumOf {it.length()}
     fun usedBytes(): Long = root.walkTopDown().filter {it.isFile}.sumOf {it.length()}
     private fun networkAllowed(allowMobile: Boolean) {if(!allowMobile&&!wifi()) throw ClientFailure("mobile.local.wifi_required")}
