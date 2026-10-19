@@ -23,15 +23,24 @@ O app usa o identificador `io.github.fakesss.vozia` e convive com o VoiceStudio 
 
 ## Primeiro uso (teste rápido)
 
-1. **Início → Falar**: digite um texto. O motor padrão é a **voz do sistema Android** (funciona na hora,
-   sem download).
+1. **Início → Falar**: digite um texto. Se o celular tiver um mecanismo de voz offline (por exemplo,
+   o do Google), a **voz do sistema Android** já funciona, sem download.
 2. Para a voz de IA em português, toque no seletor de modelo e escolha **Piper Faber (português do
-   Brasil)** (67 MB) ou **Supertonic 3** (129 MB, 31 idiomas); toque em **Baixar**, revise e aceite a
-   licença.
+   Brasil)** (67 MB, sugerido primeiro em celulares em português) ou **Supertonic 3** (129 MB,
+   31 idiomas); toque em **Baixar**, revise e aceite a licença.
 3. Toque em **Gerar**. A geração roda em segundo plano (pode sair da tela) e aparece em **Tarefas**.
 4. Ouça no player e toque em **Salvar em Downloads**. O app mostra o local exato, por exemplo
    `Download/VoiceStudio/Meus áudios/Bom dia.wav`, e **Abrir em outro app**.
 5. Feche o app, reinicie o celular e abra de novo: o áudio continua em **Projetos** e em **Recentes**.
+
+<p>
+<img src="docs/screenshots/inicio.jpg" width="180" alt="Início">
+<img src="docs/screenshots/falar.jpg" width="180" alt="Falar">
+<img src="docs/screenshots/salvo-em-downloads.jpg" width="180" alt="Salvo em Downloads">
+<img src="docs/screenshots/projetos.jpg" width="180" alt="Projetos">
+</p>
+
+Capturas reais do app em um emulador Android 14 durante os testes automatizados.
 
 ## Recursos
 
@@ -39,13 +48,13 @@ O app usa o identificador `io.github.fakesss.vozia` e convive com o VoiceStudio 
 |---|---|---|
 | Texto em fala (voz do sistema, Piper pt-BR, Supertonic 3, Kokoro v1.0/v1.1, Kitten) | ✅ no celular, offline | Falar |
 | Velocidade, vozes nomeadas, idioma, título, projeto de destino | ✅ | Falar |
-| Clonagem de voz por gravação ou arquivo (OmniVoice) | ⚠️ implementado (upstream), não validado em dispositivo neste projeto; exige 6 GB RAM | Vozes |
+| Clonagem de voz por gravação ou arquivo (OmniVoice) | ✅ no celular (validado em emulador com 8 GB; lento, exige 6 GB RAM) | Vozes |
 | Criar, renomear, excluir vozes | ✅ | Vozes |
 | Gravação e importação de áudio | ✅ | Vozes, Transcrever |
 | Transcrição de áudio/vídeo → TXT, SRT, VTT (Whisper) | ✅ no celular | Transcrever |
 | Ditado: inglês em tempo real (Zipformer) e português/outros por frases (Whisper) | ✅ no celular | Ditar |
 | Audiolivros: TXT/MD/EPUB, capítulos editáveis, geração em segundo plano, livro completo | ✅ | Audiolivros |
-| Dublagem de vídeo (Whisper → Qwen3 → OmniVoice, sincronização por segmentos, MP4/WAV) | ⚠️ implementado (upstream), não validado em dispositivo neste projeto; exige 8 GB RAM | Dublar |
+| Dublagem de vídeo (Whisper → Qwen3 → OmniVoice, sincronização por segmentos, MP4/WAV) | ✅ no celular (validado em emulador com 8 GB; lento, ~2 GB de modelos) | Dublar |
 | Projetos persistentes, histórico de tarefas, exclusão com confirmação | ✅ | Projetos, Tarefas |
 | Exportar WAV/M4A para Downloads, pasta escolhida ou "Salvar como", compartilhar, abrir em outro app | ✅ | Todos os resultados |
 | Gerenciar modelos (baixar, cancelar, retomar, excluir, licenças) | ✅ | Configurações → Modelos |
@@ -78,6 +87,10 @@ Veja [docs/COMPILACAO.md](docs/COMPILACAO.md) (local e GitHub Actions, APK/AAB a
 
 ## Testes
 
+155 testes JVM e testes de ponta a ponta em emuladores Android 10, 14 e 15 (celular e tablet):
+download do modelo, geração real de fala em português, exportação para Downloads, leitura por outro
+app, persistência após fechar, reiniciar e atualizar, falta de espaço, cancelamento, além de clonagem
+e dublagem com modelos grandes. Nenhum celular físico foi testado ainda.
 Relatório completo: [docs/RELATORIO-DE-TESTES.md](docs/RELATORIO-DE-TESTES.md).
 
 ## Licença e créditos

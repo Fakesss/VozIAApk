@@ -146,6 +146,8 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
       - name: Run end-to-end checks on the emulator
+        # The heavy-model job (~2 GB of models, ~25 min) runs on manual dispatch or "[heavy]" in the commit message.
+        if: matrix.full != 'heavy' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[heavy]')
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
@@ -159,7 +161,10 @@ jobs:
           script: bash mobile/android/scripts/device-e2e.sh dist device-results ${{ matrix.full }}
       - name: Show summary
         if: always()
-        run: cat device-results/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+        run: |
+          mkdir -p device-results
+          [[ -f device-results/summary.md ]] || echo "Skipped (heavy models run on demand)" > device-results/summary.md
+          cat device-results/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
