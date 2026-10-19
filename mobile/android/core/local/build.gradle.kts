@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "com.voicestudio.mobile.local"
     compileSdk = 36
-    ndkVersion = "27.1.12297006"
+    ndkVersion = providers.environmentVariable("ANDROID_NDK_VERSION").orElse("27.1.12297006").get()
     defaultConfig {
         minSdk = 29
         // Native code finds these classes and methods by name; keep them if the app is shrunk.

@@ -9,7 +9,7 @@ val appVersion = (JsonSlurper().parse(repository.resolve("package.json")) as Map
 android {
     namespace = "com.voicestudio.mobile"
     compileSdk = 36
-    ndkVersion = "27.1.12297006"
+    ndkVersion = providers.environmentVariable("ANDROID_NDK_VERSION").orElse("27.1.12297006").get()
     defaultConfig {
         applicationId = "com.voicestudio.mobile"
         minSdk = 29

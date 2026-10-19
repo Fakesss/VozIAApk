@@ -4,7 +4,10 @@ import hashlib
 import json
 import pathlib
 import shutil
+import subprocess
 import tarfile
+import tempfile
+import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -61,6 +64,37 @@ def extract(archive, destination):
     entries[0].rename(destination)
     temporary.rmdir()
 
+def git_snapshot(name, repo, commit, digest):
+    """Fallback when codeload.github.com is unreachable: fetch the exact commit.
+
+    Git verifies every object against its hash, and the fetched commit must be
+    the pinned one, so the extracted tree is the reviewed source. The resulting
+    archive is not byte-identical to codeload's, so it is stored separately and
+    keyed by commit instead of by the codeload SHA-256.
+    """
+    target = BUILD / 'downloads' / (name + '-' + commit + '.git.tar')
+    if target.exists():
+        return target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=target.parent) as work:
+        env = dict(**__import__('os').environ, GIT_CEILING_DIRECTORIES=work)
+        run = lambda *args: subprocess.run(['git', '-C', work, *args], check=True, env=env, capture_output=True, text=True).stdout.strip()
+        run('init', '-q', '--bare')
+        run('fetch', '-q', '--depth', '1', repo, commit)
+        if run('rev-parse', 'FETCH_HEAD^{commit}') != commit:
+            raise ValueError('Fetched commit mismatch: ' + name)
+        temporary = target.with_suffix('.partial')
+        run('archive', '--format=tar', '--prefix=' + name + '-' + commit + '/', '-o', str(temporary), commit)
+        temporary.replace(target)
+    return target
+
+def source(name, repo, commit, digest):
+    try:
+        return fetch(name + '.tar.gz', repo.replace('https://github.com/', 'https://codeload.github.com/') + '/tar.gz/' + commit, digest)
+    except (urllib.error.URLError, OSError) as error:
+        print('codeload unavailable for ' + name + ' (' + str(error) + '); using verified git fetch')
+        return git_snapshot(name, repo, commit, digest)
+
 if __name__ == '__main__':
     aar = PINS['sherpa-onnx']['android_aar']
     fetch('sherpa.aar', aar['url'], aar['sha256'])
@@ -69,10 +103,10 @@ if __name__ == '__main__':
         checksum = CHECKSUMS[name]
         if pin['commit'] != checksum['commit']:
             raise ValueError('Update reviewed source checksum for ' + name)
-        archive = fetch(name + '.tar.gz', pin['repo'].replace('https://github.com/', 'https://codeload.github.com/') + '/tar.gz/' + pin['commit'], checksum['sha256'])
+        archive = source(name, pin['repo'], pin['commit'], checksum['sha256'])
         extract(archive, BUILD / 'sources' / (name + '-' + pin['commit']))
     ggml = CHECKSUMS['ggml']
-    archive = fetch('ggml.tar.gz', 'https://codeload.github.com/' + ggml['repo'] + '/tar.gz/' + ggml['commit'], ggml['sha256'])
+    archive = source('ggml', 'https://github.com/' + ggml['repo'], ggml['commit'], ggml['sha256'])
     destination = BUILD / 'sources' / ('omnivoice.cpp-' + PINS['omnivoice.cpp']['source']['commit']) / 'ggml'
     if destination.exists() and not list(destination.iterdir()):
         destination.rmdir()
