@@ -106,6 +106,8 @@ class VoziaHeavyTaskTest {
         assumeTrue("needs ${omni.minRamGb} GB of RAM", omni.fits(runtime.ramBytes))
         for (model in listOf(piper, whisper, omni)) install(runtime, model)
         report("cpu_variant", nativeCpuVariant())
+        val flags = File("/proc/cpuinfo").readLines().firstOrNull { it.startsWith("flags") || it.startsWith("Features") }.orEmpty().substringAfter(':').split(' ').toSet()
+        report("cpu_flags", listOf("avx", "avx2", "fma", "f16c", "bmi2", "asimddp", "asimdhp", "i8mm", "bf16").filter { it in flags }.joinToString(" "))
 
         // A phone voice made from a Piper recording, as the Voices screen does with the microphone.
         val reference = File(context.cacheDir, "reference.wav")

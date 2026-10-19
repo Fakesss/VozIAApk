@@ -23,7 +23,8 @@ struct StepHook {
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_voicestudio_mobile_local_NativeBridge_omniAbi(JNIEnv*,jobject) {return OV_ABI_VERSION;}
 // seconds>0 fixes the output length (a dub line in its slot); reserve = cores left to the other lane.
-extern "C" JNIEXPORT jfloatArray JNICALL Java_com_voicestudio_mobile_local_NativeBridge_cloneAudio(JNIEnv* e,jobject,jstring model,jstring codec,jstring text,jstring refText,jfloatArray reference,jfloat seconds,jint reserve,jobject control) {
+// steps>0 sets the MaskGIT decoding steps (32 by default; fewer is faster and less faithful).
+extern "C" JNIEXPORT jfloatArray JNICALL Java_com_voicestudio_mobile_local_NativeBridge_cloneAudio(JNIEnv* e,jobject,jstring model,jstring codec,jstring text,jstring refText,jfloatArray reference,jfloat seconds,jint steps,jint reserve,jobject control) {
     Utf8 m(e,model),c(e,codec),t(e,text),r(e,refText); Control ctl(e,control);
     ov_log_set([](ov_log_level,const char*,void*){},nullptr);
     ov_init_params init{}; ov_init_default_params(&init); init.model_path=m.chars;init.codec_path=c.chars;init.use_fa=false;
@@ -35,6 +36,7 @@ extern "C" JNIEXPORT jfloatArray JNICALL Java_com_voicestudio_mobile_local_Nativ
     ov_tts_params params{};ov_tts_default_params(&params);params.text=t.chars;params.ref_text=r.chars;
     params.ref_audio_24k=ref.data();params.ref_n_samples=ref.size();params.cancel=Control::cancelled;params.cancel_user_data=&ctl;
     if(seconds>0.f)params.T_override=ov_duration_sec_to_tokens(context.get(),std::min(static_cast<float>(seconds),30.f));
+    if(steps>0)params.mg_num_step=std::clamp(static_cast<int>(steps),8,64);
     ov_audio audio{};ov_status status;
     {StepHook hook(&ctl);status=ov_synthesize(context.get(),&params,&audio);}
     jfloatArray result=nullptr;

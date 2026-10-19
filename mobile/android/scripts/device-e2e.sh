@@ -32,10 +32,10 @@ if [[ $FULL == heavy ]]; then
     log "## Heavy models · $(adb shell getprop ro.product.model | tr -d '\r') · API $(adb shell getprop ro.build.version.sdk | tr -d '\r') · RAM $(adb shell cat /proc/meminfo | head -1 | tr -s ' ' | tr -d '\r')"
     adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; adb install -r "$DIST/app-debug-androidTest.apk" >> "$OUT/install.txt" 2>&1
     smoke=(-e downloadSmokeModels true -e acceptModelLicencesForSmoke true)
-    start=$(date +%s); instrument clone com.voicestudio.mobile.VoziaHeavyTaskTest -e heavyTasks true -e acceptModelLicences true
-    result "Cloned-voice task: OmniVoice progress, Piper task finishes alongside it, cancel frees OmniVoice ($(( $(date +%s) - start )) s including downloads)" $?
-    start=$(date +%s); instrument dub com.voicestudio.mobile.PhoneDubInferenceTest -e dubInferenceSmoke true "${smoke[@]}"
-    result "Phone dub: Whisper → Qwen3 translation to French → OmniVoice, muxed output ($(( $(date +%s) - start )) s)" $?
+    start=$(date +%s); instrument clone com.voicestudio.mobile.VoziaHeavyTaskTest -e heavyTasks true -e acceptModelLicences true; code=$?
+    result "Cloned-voice task: OmniVoice progress, Piper task finishes alongside it, cancel frees OmniVoice ($(( $(date +%s) - start )) s including downloads)" $code
+    start=$(date +%s); instrument dub com.voicestudio.mobile.PhoneDubInferenceTest -e dubInferenceSmoke true "${smoke[@]}"; code=$?
+    result "Phone dub: Whisper → Qwen3 translation to French → OmniVoice, muxed output ($(( $(date +%s) - start )) s)" $code
     adb logcat -d > "$OUT/logcat.txt" 2>&1 || true
     log ""; log "Failures: $failures"; exit $failures
 fi
@@ -44,8 +44,8 @@ if [[ $FULL == models ]]; then
     # Every downloadable text-to-speech model through the background task, as the Speak screen runs it.
     log "## TTS models · $(adb shell getprop ro.product.model | tr -d '\r') · API $(adb shell getprop ro.build.version.sdk | tr -d '\r')"
     adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; adb install -r "$DIST/app-debug-androidTest.apk" >> "$OUT/install.txt" 2>&1
-    start=$(date +%s); instrument models com.voicestudio.mobile.VoziaModelMatrixTest -e modelMatrix true -e acceptModelLicences true
-    result "Every TTS model speaks through a background task ($(( $(date +%s) - start )) s including downloads)" $?
+    start=$(date +%s); instrument models com.voicestudio.mobile.VoziaModelMatrixTest -e modelMatrix true -e acceptModelLicences true; code=$?
+    result "Every TTS model speaks through a background task ($(( $(date +%s) - start )) s including downloads)" $code
     adb logcat -d > "$OUT/logcat.txt" 2>&1 || true
     grep -E "FATAL EXCEPTION|AndroidRuntime|signal [0-9]+ \(SIG" -A20 "$OUT/logcat.txt" | head -80 > "$OUT/crashes.txt" || true
     log ""; log "Failures: $failures"; exit $failures
@@ -53,13 +53,13 @@ fi
 
 log "## Device $(adb shell getprop ro.product.model | tr -d '\r') · Android $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r')) · $ABI · $(adb shell wm size | tr -d '\r' | sed 's/Physical size: //') · $(adb shell wm density | tr -d '\r' | sed 's/Physical density: //') dpi"
 log ""
-adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; result "1. Install $(basename "$APP")" $?
+adb install -r -g "$APP" > "$OUT/install.txt" 2>&1; code=$?; result "1. Install $(basename "$APP")" $code
 adb install -r "$DIST/app-debug-androidTest.apk" >> "$OUT/install.txt" 2>&1
 adb logcat -c || true
 adb shell am start -W -n $PKG/com.voicestudio.mobile.MainActivity > "$OUT/launch.txt" 2>&1
 sleep 6
 pid=$(adb shell pidof $PKG | tr -d '\r'); adb exec-out screencap -p > "$OUT/00-launch.png"
-[[ -n $pid ]] && grep -q "Status: ok" "$OUT/launch.txt"; result "1. Launch (pid $pid, $(grep TotalTime "$OUT/launch.txt" | tr -d '\r'))" $?
+[[ -n $pid ]] && grep -q "Status: ok" "$OUT/launch.txt"; code=$?; result "1. Launch (pid $pid, $(grep TotalTime "$OUT/launch.txt" | tr -d '\r'))" $code
 adb shell am force-stop $PKG
 
 instrument native com.voicestudio.mobile.LocalInferenceTest#allPinnedNativeLibrariesLoadTogether; result "Native runtimes (sherpa-onnx, OmniVoice, llama.cpp) load on ART" $?
@@ -84,7 +84,7 @@ for f in sorted(root.rglob('*')):
         head = f.read_bytes()[:12]; print(f"{f.relative_to(root)}: M4A ftyp={head[4:8] == b'ftyp'} {f.stat().st_size} bytes")
 sys.exit(0 if ok else 1)
 EOF
-result "7. Exported files readable outside the app: $(tr '\n' ';' < "$OUT/outside-app-check.txt")" $?
+code=$?; result "7. Exported files readable outside the app: $(tr '\n' ';' < "$OUT/outside-app-check.txt")" $code
 
 adb shell am force-stop $PKG
 instrument persist-restart com.voicestudio.mobile.VoziaPersistenceTest; result "8. Data persists after closing (force-stop) and reopening" $?

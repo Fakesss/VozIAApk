@@ -194,7 +194,9 @@
    "title": "Performance and background",
    "cpu": "Processor acceleration: {{variant}} · {{cores}} cores",
    "copy_report": "Copy diagnostic report",
-   "copied": "Report copied. It lists your device, models and recent tasks, without texts or audio."
+   "copied": "Report copied. It lists your device, models and recent tasks, without texts or audio.",
+   "fast_clone": "Fast cloning",
+   "fast_clone_hint": "Cloned voices and dubbing decode in 16 steps instead of 32: about twice as fast, with a voice slightly less faithful to the sample."
   }
  },
  "mobile": {

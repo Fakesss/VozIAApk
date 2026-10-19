@@ -62,6 +62,10 @@ fun requestUnrestrictedBattery(context: Context) {
             if (restricted) Secondary("vozia.battery.allow") { requestUnrestrictedBattery(context) }
             Text(tr("vozia.performance.cpu", mapOf("variant" to nativeCpuVariant(), "cores" to Runtime.getRuntime().availableProcessors())),
                 style = MaterialTheme.typography.bodySmall, color = role("textMuted"))
+            val runtime = remember { com.voicestudio.mobile.local.PhoneRuntime.get(context) }
+            var fast by remember { mutableStateOf(runtime.fastClone) }
+            Toggle("vozia.performance.fast_clone", fast) { fast = it; runtime.fastClone = it }
+            Text(tr("vozia.performance.fast_clone_hint"), style = MaterialTheme.typography.bodySmall, color = role("textMuted"))
             Secondary("vozia.performance.copy_report") {
                 vm.phone.launch {
                     val report = diagnosticReport(context, vm, version)
@@ -85,7 +89,7 @@ suspend fun diagnosticReport(context: Context, vm: StudioViewModel, version: Str
         appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE}), Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
         appendLine("ABI: ${Build.SUPPORTED_ABIS.joinToString()}; cores: ${Runtime.getRuntime().availableProcessors()}; CPU build: ${nativeCpuVariant()}")
         appendLine("RAM: ${memory.totalMem / 1_000_000} MB total, ${memory.availMem / 1_000_000} MB free; low memory: ${memory.lowMemory}")
-        appendLine("Battery restricted: ${batteryRestricted(context)}; storage free: ${context.filesDir.usableSpace / 1_000_000} MB")
+        appendLine("Battery restricted: ${batteryRestricted(context)}; storage free: ${context.filesDir.usableSpace / 1_000_000} MB; fast cloning: ${com.voicestudio.mobile.local.PhoneRuntime.get(context).fastClone}")
         appendLine("Installed models: ${phone.installed.sorted().joinToString().ifEmpty { "-" }}")
         appendLine("Report time: ${time.format(Date())}")
         appendLine()

@@ -194,7 +194,9 @@
    "title": "Desempenho e segundo plano",
    "cpu": "Aceleração do processador: {{variant}} · {{cores}} núcleos",
    "copy_report": "Copiar relatório de diagnóstico",
-   "copied": "Relatório copiado. Ele lista o aparelho, os modelos e as tarefas recentes, sem textos nem áudios."
+   "copied": "Relatório copiado. Ele lista o aparelho, os modelos e as tarefas recentes, sem textos nem áudios.",
+   "fast_clone": "Clonagem rápida",
+   "fast_clone_hint": "Vozes clonadas e dublagem usam 16 passos em vez de 32: cerca de duas vezes mais rápido, com a voz um pouco menos fiel à amostra."
   }
  },
  "mobile": {

@@ -17,17 +17,29 @@ class PhoneRuntime private constructor(context: Context) {
         connectivity.activeNetwork?.let {connectivity.getNetworkCapabilities(it)}?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)==true
     }
     val speech=SystemSpeech(app)
-    // English dictionary espeak falls back to for foreign characters; the Piper pt-BR download lacks it.
-    private val bundledEspeak=listOf("en_dict","lang/gmw/en","lang/gmw/en-US")
-    val engine: LocalEngine=PhoneLocalEngine(downloads,speech,{models()}) {directory ->
-        for(name in bundledEspeak) {
-            val target=File(directory,name)
-            if(target.exists()) continue
+    // espeak-ng reads its voice list once per process, so the shared folder must hold every
+    // language before the first espeak voice speaks: the app bundles the catalogue's espeak
+    // data (the same files the models ship; checked by AssetsTest) and copies it on first use.
+    private val engineSettings=app.getSharedPreferences("vozia-engine",Context.MODE_PRIVATE)
+    /** Fast cloning: OmniVoice decodes in 16 steps instead of 32 (about twice as fast, slightly less faithful). */
+    var fastClone: Boolean
+        get()=engineSettings.getBoolean("fast_clone",false)
+        set(value) {engineSettings.edit().putBoolean("fast_clone",value).apply()}
+    val engine: LocalEngine=PhoneLocalEngine(downloads,speech,{models()},{directory -> copyBundledEspeak(directory)}) {if(fastClone) 16 else 0}
+    private fun copyBundledEspeak(directory: File) {
+        val stamp=File(directory,".bundled")
+        val version=app.packageManager.getPackageInfo(app.packageName,0).lastUpdateTime.toString()
+        if(stamp.takeIf {it.exists()}?.readText()==version) return
+        fun copy(asset: String, target: File) {
+            val children=app.assets.list(asset).orEmpty()
+            if(children.isNotEmpty()) {children.forEach {copy("$asset/$it",File(target,it))};return}
             target.parentFile!!.mkdirs()
             val pending=File(target.path+".tmp")
-            app.assets.open("espeak-ng-data/$name").use {input -> pending.outputStream().use {input.copyTo(it)}}
+            app.assets.open(asset).use {input -> pending.outputStream().use {input.copyTo(it)}}
             if(!pending.renameTo(target)) pending.delete()
         }
+        copy("espeak-ng-data",directory)
+        stamp.writeText(version)
     }
     @Volatile private var catalogue: List<PhoneModel>?=null
     /** Bundled models.json plus the system voice; decoded once per process. */

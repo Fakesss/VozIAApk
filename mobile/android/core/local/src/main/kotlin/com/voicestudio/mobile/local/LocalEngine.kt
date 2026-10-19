@@ -58,8 +58,8 @@ internal object NativeBridge {
     }}
     external fun omniAbi(): Int
     external fun llamaDevices(): Int
-    /** [seconds] > 0 fixes the output length; [reserve] cores stay free for the small-model lane. */
-    external fun cloneAudio(model: String, codec: String, text: String, referenceText: String, reference: FloatArray, seconds: Float, reserve: Int, control: NativeControl): FloatArray?
+    /** [seconds] > 0 fixes the output length; [steps] > 0 sets decoding steps; [reserve] cores stay free for the small-model lane. */
+    external fun cloneAudio(model: String, codec: String, text: String, referenceText: String, reference: FloatArray, seconds: Float, steps: Int, reserve: Int, control: NativeControl): FloatArray?
     external fun translateText(model: String, prompt: String, formatted: Boolean, reserve: Int, control: NativeControl): ByteArray?
 }
 
@@ -76,7 +76,9 @@ class EngineWait(val waiting: suspend (Boolean)->Unit): kotlin.coroutines.Abstra
  * voices; [seedEspeak] adds bundled espeak files to it.
  */
 class PhoneLocalEngine(private val models: ModelDownloads, private val system: SystemSpeech? = null,
-    private val catalogue: ()->List<PhoneModel> = {emptyList()}, private val seedEspeak: (File)->Unit = {}): LocalEngine {
+    private val catalogue: ()->List<PhoneModel> = {emptyList()}, private val seedEspeak: (File)->Unit = {},
+    /** OmniVoice decoding steps; 0 keeps the model's default (32). */
+    private val cloneSteps: ()->Int = {0}): LocalEngine {
     companion object {
         // One large GGUF model (OmniVoice, llama.cpp) and one small ONNX model run at a
         // time: a slow clone or dub no longer holds up ordinary speech or transcription,
@@ -233,7 +235,7 @@ class PhoneLocalEngine(private val models: ModelDownloads, private val system: S
         if(codec.isBlank()) throw ClientFailure("mobile.local.model_incompatible")
         // Below a second the model has too little room to say anything; let it pace itself.
         val length=seconds?.takeIf {it>=1.0}?.toFloat() ?: 0f
-        val result=NativeBridge.cloneAudio(model.role(dir,"model"),codec,text,referenceText,reference.samples,length,laneReserve(),NativeControl(job,progress) {models.licence.accepted(model)})
+        val result=NativeBridge.cloneAudio(model.role(dir,"model"),codec,text,referenceText,reference.samples,length,cloneSteps(),laneReserve(),NativeControl(job,progress) {models.licence.accepted(model)})
         job.ensureActive();models.licence.requireAccepted(model)
         LocalAudio(result ?: throw ClientFailure("mobile.local.inference_failed"),24000)
     }
