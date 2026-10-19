@@ -2,7 +2,9 @@
 
 Data: 19/10/2026. Os resultados abaixo vêm de execuções reais; os arquivos brutos (resumos, logs,
 capturas de tela e os próprios arquivos exportados) estão anexados às releases do GitHub como
-`device-results-*.zip` (builds `build-3` e `build-4`).
+`device-results-*.zip`. A build **`build-5`** (código final, commit `eded98e`) repetiu toda a matriz:
+**0 falhas** em Android 10, 14 e 15; a clonagem e a dublagem com modelos grandes foram executadas na
+`build-3` (o job pesado agora roda sob demanda).
 
 ## Ambientes
 
