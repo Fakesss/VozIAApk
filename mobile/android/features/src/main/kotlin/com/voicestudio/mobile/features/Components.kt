@@ -56,7 +56,10 @@ fun Modifier.dismissKeyboardOnTap(): Modifier = composed {
 
 @Composable fun Screen(content: @Composable ColumnScope.() -> Unit) {
     // Insets shrink the viewport, not the scrollable content. Every form shares this path.
-    Column(Modifier.fillMaxSize().imePadding().dismissKeyboardOnTap().verticalScroll(rememberScrollState()).padding(VSTheme.inset), verticalArrangement = Arrangement.spacedBy(VSTheme.gap), content = content)
+    // Tablets and landscape: a centered, readable column instead of full-width forms.
+    Column(Modifier.fillMaxSize().imePadding().dismissKeyboardOnTap().verticalScroll(rememberScrollState()).padding(VSTheme.inset), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.widthIn(max = 840.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(VSTheme.gap), content = content)
+    }
 }
 @Composable fun ScreenTitle(key: String) { Text(tr(key), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() }) }
 @Composable fun Heading(key: String) { Text(tr(key), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() }) }
