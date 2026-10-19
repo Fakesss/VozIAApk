@@ -32,6 +32,7 @@ dependencies {
     implementation(libs.serialization)
     implementation(libs.okhttp)
     implementation(libs.core)
+    implementation(libs.commons.compress)
     api(project(":core:network"))
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

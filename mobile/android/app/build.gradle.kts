@@ -36,7 +36,7 @@ val bundleCatalogs by tasks.registering {
     inputs.file(repository.resolve("electron/public/signal-field.webp"))
     inputs.file(repository.resolve("electron/src/shared/languages.json"))
     inputs.file(repository.resolve("LICENSE"))
-    inputs.files(fileTree(contracts) { include("strings*.en.json", "tokens.json", "openapi.json", "models.json") })
+    inputs.files(fileTree(contracts) { include("strings.*.json", "tokens.json", "openapi.json", "models.json") })
     outputs.dir(layout.buildDirectory.dir("generated/catalogs"))
     outputs.dir(layout.buildDirectory.dir("generated/catalogResources"))
     doLast {
@@ -49,7 +49,7 @@ val bundleCatalogs by tasks.registering {
         assets.resolve("licenses").mkdirs()
         repository.resolve("LICENSE").copyTo(assets.resolve("licenses/VoiceStudio-AGPL-3.0.txt"), overwrite=true)
         catalogs.listFiles()!!.filter { it.extension == "json" }.forEach { it.copyTo(out.resolve(it.name), overwrite = true) }
-        contracts.listFiles()!!.filter { it.name.startsWith("strings") && it.name.endsWith(".en.json") }.forEach { it.copyTo(assets.resolve(it.name), overwrite = true) }
+        contracts.listFiles()!!.filter { it.name.startsWith("strings.") && it.name.endsWith(".json") }.forEach { it.copyTo(assets.resolve(it.name), overwrite = true) }
         contracts.resolve("models.json").copyTo(assets.resolve("models.json"), overwrite = true)
         contracts.resolve("tokens.json").copyTo(assets.resolve("tokens.json"), overwrite = true)
         val en = JsonSlurper().parse(catalogs.resolve("en.json")) as Map<*, *>

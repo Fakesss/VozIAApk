@@ -41,7 +41,8 @@ class AndroidDubMedia: DubMedia {
         catch(e:Exception) {throw ClientFailure("mobile.simple.media_failed")}
         finally {encoded.delete();pending.delete()}
     }
-    private suspend fun encodeAac(audio: PcmFile,output: File,progress: (Float)->Unit) {
+    /** Mono AAC-LC in an MP4 (M4A) container; also used for compact audio exports. */
+    suspend fun encodeAac(audio: PcmFile,output: File,progress: (Float)->Unit) {
         val codec=MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
         var muxer: MediaMuxer?=null;var codecStarted=false;var muxStarted=false;var completed=false
         try {

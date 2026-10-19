@@ -34,6 +34,7 @@ camera-camera2 = { module = "androidx.camera:camera-camera2", version = "1.5.0" 
 camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version = "1.5.0" }
 camera-view = { module = "androidx.camera:camera-view", version = "1.5.0" }
 zxing = { module = "com.google.zxing:core", version = "3.5.3" }
+commons-compress = { module = "org.apache.commons:commons-compress", version = "1.27.1" }
 junit = { module = "junit:junit", version = "4.13.2" }
 robolectric = { module = "org.robolectric:robolectric", version = "4.16" }
 robolectric-sdk = { module = "org.robolectric:android-all-instrumented", version = "14-robolectric-10818077-i7" }

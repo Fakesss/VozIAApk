@@ -645,12 +645,12 @@
         "id": "CC-BY-NC-4.0; Higgs Audio 2; Meta Llama 3",
         "category": "non-commercial",
         "requires_acceptance": true,
-        "credit": "OmniVoice \u2014 Han Zhu and coauthors; GGUF conversion by Serveurperso; tokenizer by Boson AI / Meta",
-        "rights_holder": "OmniVoice \u2014 Han Zhu and coauthors; GGUF conversion by Serveurperso; tokenizer by Boson AI / Meta",
+        "credit": "OmniVoice — Han Zhu and coauthors; GGUF conversion by Serveurperso; tokenizer by Boson AI / Meta",
+        "rights_holder": "OmniVoice — Han Zhu and coauthors; GGUF conversion by Serveurperso; tokenizer by Boson AI / Meta",
         "terms_fingerprint": "c61e2d14574712db2441bc5e7e01eb5cec871473fcf95a8e8ca07799fa0d8f42",
         "terms": {
           "license": "CC-BY-NC-4.0; Higgs Audio 2; Meta Llama 3",
-          "credit": "OmniVoice \u2014 Han Zhu and coauthors; GGUF conversion by Serveurperso; tokenizer by Boson AI / Meta",
+          "credit": "OmniVoice — Han Zhu and coauthors; GGUF conversion by Serveurperso; tokenizer by Boson AI / Meta",
           "notes": "Conversion card names CC-BY-NC-4.0; its codec description does not override the actual tokenizer terms. See docs/model-credits.md.",
           "license_category": "noncommercial",
           "commercial_inference": "restricted",
@@ -754,6 +754,912 @@
         }
       },
       "total_bytes": 1107409472
+    },
+    {
+      "id": "piper-pt-br-faber",
+      "name": "Piper Faber (português do Brasil)",
+      "capability": "tts",
+      "runtime": "sherpa-onnx",
+      "repo": "",
+      "revision": "",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pt_BR-faber-medium.tar.bz2",
+        "sha256": "7add3f923ad6bc25ca8a192805fd1a64d1b3893e4611c4a9719545a825039a83",
+        "size": 67183065,
+        "root": "vits-piper-pt_BR-faber-medium"
+      },
+      "files": [
+        {
+          "path": "pt_BR-faber-medium.onnx",
+          "size": 63201457,
+          "sha256": "956b4f1733903891c4ba0973d0603b2a3d8c09c8432fb3bb5203a90a7431daca",
+          "role": "model"
+        },
+        {
+          "path": "MODEL_CARD",
+          "size": 279,
+          "sha256": "01f1a5bcfd0538782726059ae407eae9c2dd1b5b35f7298fd53a68de91afe563",
+          "role": "notice"
+        },
+        {
+          "path": "espeak-ng-data/intonations",
+          "size": 2040,
+          "sha256": "3f8af65fd3eda9759a10f021d61361c120871f463515229c925995c7f90918cc",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/pt",
+          "size": 95,
+          "sha256": "a44060072f790e41912c57b7d52f7b6438c4383e0dabdb052f6fdb7aacc23493",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/pt-BR",
+          "size": 109,
+          "sha256": "84dd4e34c970fadbe32211eadecfdfaab52432479c0911e43300da88a33398ba",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/phondata",
+          "size": 550424,
+          "sha256": "4e0288957874029a8c3c9f41a8f517ad4bf18127046decbdd4b9d1d6807ce3a3",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/phonindex",
+          "size": 39074,
+          "sha256": "3ca7b8fa3b42624e4b0f152707e7a39245fce569aa99ea47c055d9e622fcf0c4",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/phontab",
+          "size": 55796,
+          "sha256": "886f3fa402cb0ba73d483aa8ad000af47a6b7cc06293c75a97913fba68a530f6",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/pt_dict",
+          "size": 67817,
+          "sha256": "7e8398f15fa4a21db39a213381f28ec0d302b22663c644e865abb61a09c1b004",
+          "role": "espeak-data"
+        },
+        {
+          "path": "tokens.txt",
+          "size": 907,
+          "sha256": "2619c1a9de1bcf928162f40c583caf39368cfd6b2340c7bcad51dc634411ec36",
+          "role": "tokens"
+        }
+      ],
+      "languages": [
+        "pt-BR"
+      ],
+      "min_ram_gb": 2,
+      "config": {
+        "model_type": "vits",
+        "sample_rate": 22050,
+        "num_speakers": 1,
+        "default_speaker_id": 0,
+        "data_dir": "espeak-ng-data",
+        "length_scale": 1.0,
+        "num_threads": 2,
+        "provider": "cpu",
+        "speakers": [
+          {
+            "id": 0,
+            "name": "Faber",
+            "language": "pt-BR"
+          }
+        ]
+      },
+      "licence": {
+        "id": "cc0-1.0 (dataset); gpl-3.0 (eSpeak NG data); see notes",
+        "category": "conditional",
+        "requires_acceptance": true,
+        "credit": "Piper voice 'faber' by the Open Home Foundation / rhasspy contributors; ONNX packaging by Fangjun Kuang (sherpa-onnx); eSpeak NG contributors",
+        "rights_holder": "Open Home Foundation / rhasspy contributors; eSpeak NG contributors",
+        "terms": {
+          "license": "Dataset CC0 per the bundled MODEL_CARD; phonemizer data eSpeak NG (GPL-3.0)",
+          "notes": "The MODEL_CARD declares a CC0 dataset and states the voice was fine-tuned from the U.S. English 'lessac' voice, whose original dataset carries its own terms. Commercial use of the weights and of generated audio is therefore not asserted. Review the upstream terms before commercial use.",
+          "commercial_inference": "unknown",
+          "commercial_outputs": "unknown",
+          "redistribution": "unknown",
+          "voice_rights": "unknown",
+          "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+          "evidence_url": "https://huggingface.co/rhasspy/piper-voices/tree/main/pt/pt_BR/faber/medium"
+        },
+        "terms_fingerprint": "5a7280611b24839e07c0775770e043db99bb2a4052d861fe8b49f34c1203b191"
+      },
+      "total_bytes": 63917998
+    },
+    {
+      "id": "supertonic-3-int8",
+      "name": "Supertonic 3 (31 idiomas)",
+      "capability": "tts",
+      "runtime": "sherpa-onnx",
+      "repo": "",
+      "revision": "",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2",
+        "sha256": "82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427",
+        "size": 128774318,
+        "root": "sherpa-onnx-supertonic-3-tts-int8-2026-05-11"
+      },
+      "files": [
+        {
+          "path": "LICENSE",
+          "size": 1070,
+          "sha256": "0dfe0d0ba84416fe3879d9a34f4909d8d0137c78d1e95834177b0414ac096fa2",
+          "role": "notice"
+        },
+        {
+          "path": "README.md",
+          "size": 19518,
+          "sha256": "a96c347945f7c8bc1673bea3525b1ac8d36fdde556e1e0a6a186052429caf863",
+          "role": "notice"
+        },
+        {
+          "path": "duration_predictor.int8.onnx",
+          "size": 3700147,
+          "sha256": "c3eb91414d5ff8a7a239b7fe9e34e7e2bf8a8140d8375ffb14718b1c639325db",
+          "role": "duration-predictor"
+        },
+        {
+          "path": "text_encoder.int8.onnx",
+          "size": 36416150,
+          "sha256": "c7befd5ea8c3119769e8a6c1486c4edc6a3bc8365c67621c881bbb774b9902ff",
+          "role": "text-encoder"
+        },
+        {
+          "path": "tts.json",
+          "size": 8253,
+          "sha256": "42078d3aef1cd43ab43021f3c54f47d2d75ceb4e75f627f118890128b06a0d09",
+          "role": "tts-json"
+        },
+        {
+          "path": "unicode_indexer.bin",
+          "size": 262144,
+          "sha256": "8402ca48e5189a8950138580b0fff64db6f072f24ac07cd54ba8b2fbb9883b30",
+          "role": "unicode-indexer"
+        },
+        {
+          "path": "vector_estimator.int8.onnx",
+          "size": 78400833,
+          "sha256": "20cd86fa5c6effedfda0e7cffe5b0569ca401c440a0c3a1d72bf39286c0db3fd",
+          "role": "vector-estimator"
+        },
+        {
+          "path": "vocoder.int8.onnx",
+          "size": 25991073,
+          "sha256": "e923d60f53f95eb1ce235f1dc33ec56d9c057823c96fa6f8acf98f32b0da6152",
+          "role": "vocoder"
+        },
+        {
+          "path": "voice.bin",
+          "size": 517168,
+          "sha256": "67d5209b0ee8ce6c74105ffbe12fe6a7628aea3b4ba2fcb308a4a67938a93ce8",
+          "role": "voices"
+        }
+      ],
+      "languages": [
+        "pt",
+        "en",
+        "es",
+        "fr",
+        "it",
+        "de",
+        "nl",
+        "pl",
+        "ro",
+        "ru",
+        "uk",
+        "tr",
+        "ar",
+        "hi",
+        "id",
+        "vi",
+        "ja",
+        "ko",
+        "bg",
+        "cs",
+        "da",
+        "el",
+        "et",
+        "fi",
+        "hr",
+        "hu",
+        "lt",
+        "lv",
+        "sk",
+        "sl",
+        "sv"
+      ],
+      "min_ram_gb": 3,
+      "config": {
+        "model_type": "supertonic",
+        "sample_rate": 44100,
+        "num_speakers": 10,
+        "default_speaker_id": 0,
+        "num_steps": 8,
+        "num_threads": 2,
+        "provider": "cpu",
+        "speakers": [
+          {
+            "id": 0,
+            "name": "F1"
+          },
+          {
+            "id": 1,
+            "name": "F2"
+          },
+          {
+            "id": 2,
+            "name": "F3"
+          },
+          {
+            "id": 3,
+            "name": "F4"
+          },
+          {
+            "id": 4,
+            "name": "F5"
+          },
+          {
+            "id": 5,
+            "name": "M1"
+          },
+          {
+            "id": 6,
+            "name": "M2"
+          },
+          {
+            "id": 7,
+            "name": "M3"
+          },
+          {
+            "id": 8,
+            "name": "M4"
+          },
+          {
+            "id": 9,
+            "name": "M5"
+          }
+        ]
+      },
+      "licence": {
+        "id": "openrail-m (weights); mit (sample code)",
+        "category": "conditional",
+        "requires_acceptance": true,
+        "credit": "Supertonic 3 by Supertone Inc.; int8 ONNX conversion by Fangjun Kuang (sherpa-onnx)",
+        "rights_holder": "Supertone Inc.",
+        "terms": {
+          "license": "OpenRAIL-M for the model weights; MIT for the sample code",
+          "notes": "OpenRAIL-M permits use subject to use-based restrictions listed in the upstream LICENSE (for example, no use to impersonate people without consent or to generate unlawful content). The bundled README states the model licence; the full OpenRAIL-M text is published by Supertone.",
+          "commercial_inference": "conditional",
+          "commercial_outputs": "conditional",
+          "redistribution": "conditional",
+          "voice_rights": "unknown",
+          "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+          "evidence_url": "https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE"
+        },
+        "terms_fingerprint": "097c55caad15086607178a7abeecd6b4d49f804f44771095fbeebeb8dcd28d76"
+      },
+      "total_bytes": 145316356
+    },
+    {
+      "id": "kokoro-multi-v1-0-int8",
+      "name": "Kokoro v1.0 multilíngue",
+      "capability": "tts",
+      "runtime": "sherpa-onnx",
+      "repo": "",
+      "revision": "",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "4c3052abaa60943a341f193888cf6abd68787dae6ab8ae5c925a706caa247e4e",
+        "size": 132303094,
+        "root": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": [
+        {
+          "path": "model.int8.onnx",
+          "size": 114203756,
+          "sha256": "4b86207ef680e394d8343bee22dfc4c512e5c707c6d9578e3f35ab09bffd6b36",
+          "role": "model"
+        },
+        {
+          "path": "LICENSE",
+          "size": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "role": "notice"
+        },
+        {
+          "path": "date-zh.fst",
+          "size": 59154,
+          "sha256": "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718",
+          "role": "rule-fst"
+        },
+        {
+          "path": "dict/hmm_model.utf8",
+          "size": 519739,
+          "sha256": "f17790586ac86dd048c8adffed052c4bd2b28ed0682972c1275e59040c0589a7",
+          "role": "dict"
+        },
+        {
+          "path": "dict/idf.utf8",
+          "size": 5998717,
+          "sha256": "dbd1e03d72b2263cc8d84a4304ed77677eed9e7deaf43a1a5133bbba9733b535",
+          "role": "dict"
+        },
+        {
+          "path": "dict/jieba.dict.utf8",
+          "size": 5071204,
+          "sha256": "3043b77068e09c9904f27cad82f12b6ebe9dbdb5aeff3b25e45ab7f9c1122b55",
+          "role": "dict"
+        },
+        {
+          "path": "dict/pos_dict/char_state_tab.utf8",
+          "size": 327139,
+          "sha256": "28b7be1dd7369766a51445af4d42e9a2ba4bf374c13be5bc1ca7721e27271dbb",
+          "role": "dict"
+        },
+        {
+          "path": "dict/pos_dict/prob_emit.utf8",
+          "size": 1687686,
+          "sha256": "c33c4cb7edf3b3a5947df7209b6e9f267eae1f21335d9e2bd2521ea07105457a",
+          "role": "dict"
+        },
+        {
+          "path": "dict/pos_dict/prob_start.utf8",
+          "size": 4347,
+          "sha256": "13623ea0e9300bdb597cb2da28770b7b385d6c0098d66e516083fb01b6bd5d96",
+          "role": "dict"
+        },
+        {
+          "path": "dict/pos_dict/prob_trans.utf8",
+          "size": 124159,
+          "sha256": "f22363e2307408293d180c6f9f6b5cb75879d52f722f7764fa2d3d0ae2400236",
+          "role": "dict"
+        },
+        {
+          "path": "dict/stop_words.utf8",
+          "size": 8974,
+          "sha256": "b788b8a939d2e2fe079abd579ea98f12f9fb84370bfd0dddd81bb9381f7ab42c",
+          "role": "dict"
+        },
+        {
+          "path": "dict/user.dict.utf8",
+          "size": 829194,
+          "sha256": "5faabcd0c52adf512de77fd7eee3d556da8c98b50f493b47c66a981b3a24959c",
+          "role": "dict"
+        },
+        {
+          "path": "espeak-ng-data/cmn_dict",
+          "size": 1566335,
+          "sha256": "109aaa7708d3727382acb3ae41d8e2094a7e2bb9f651a81835be22a6f08071fe",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/en_dict",
+          "size": 166944,
+          "sha256": "71bd330ba8a2e3e8076e631508208ef49449d6147c17b7bd2b4b1e1468292e35",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/es_dict",
+          "size": 49252,
+          "sha256": "3fa93e251eab80838a2d6207ee58c9c847270a65fe3fae98850e0185b5a2186c",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/fr_dict",
+          "size": 63727,
+          "sha256": "e399ab924c4d10beef1fc310b30ea56e4ddfd8b4b64b8ed978e9c65394d49b2d",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/hi_dict",
+          "size": 92143,
+          "sha256": "5a68c9532624e57ac845b26ce1e2e5034c4f6353bede46ecbe57e583ec8effd6",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/intonations",
+          "size": 2040,
+          "sha256": "3f8af65fd3eda9759a10f021d61361c120871f463515229c925995c7f90918cc",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/it_dict",
+          "size": 152889,
+          "sha256": "111f968359c9ebe36b107a2565ba9f258bab337d3cbe37e44871980a8f21ce6b",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en",
+          "size": 140,
+          "sha256": "4605d5330801de3641c6e366d15f129ea1f5ffbce8722642aba01ace07ab9c83",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en-029",
+          "size": 335,
+          "sha256": "faeb8cb201056775f733acbd908c66555fe57bf01cb063920f178f389cbf85d3",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en-GB-scotland",
+          "size": 295,
+          "sha256": "1ce4282c1f4385dbaf0035e799b2ab1ee9e9a3ab4829100594a3047727b52353",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en-GB-x-gbclan",
+          "size": 238,
+          "sha256": "2040e176f1f7f27bdce81c32d7e2b1662449d54d264afd3c0ed871b8e42b6e46",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en-GB-x-gbcwmd",
+          "size": 188,
+          "sha256": "927a5ab891c65b30b4426b151d1623a01024f6b773a38497ba1c90cd77a95747",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en-GB-x-rp",
+          "size": 249,
+          "sha256": "d0625af7f58561b1b8cf96fd7f93eee6553bcb3eadb9020ae0757bf96e5115e5",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en-US",
+          "size": 257,
+          "sha256": "41534c2a22df5dd4f1052ff9e1a33a3ea7bff5a26b5c02bdad5ba8ddb7524704",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en-US-nyc",
+          "size": 271,
+          "sha256": "e8ee9168376d1f7d9e7dcda7c4644c36c529a8bea816e6380895364db46ea2e3",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/inc/hi",
+          "size": 23,
+          "sha256": "3c1c3f916f57f2d6d6cbf7923c0f39a36ac2140e2a69ddffce917d7b8bf3ccab",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/an",
+          "size": 27,
+          "sha256": "ff8aa97c55286cc90531cad5df3cd36165abba11502a84d53b0fcd923f965f23",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/ca",
+          "size": 25,
+          "sha256": "787df034320467236292bb46f1f8781a2998a185f117d350c018b6cfcf360854",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/es",
+          "size": 63,
+          "sha256": "966aa015ea5646d79f0ca4807cf5da7339aabd3782b55cfa5eb0d8c3fc8fc588",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/es-419",
+          "size": 167,
+          "sha256": "ff0f84457ac40e3bcf61d6de58028312be74e0e6cbc3b742f31b3ce729c2aa0c",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/fr",
+          "size": 79,
+          "sha256": "95f44834b48c075dad13eace54d2c98ff79b81aa0074dd67eebaf66c2909eef8",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/fr-BE",
+          "size": 84,
+          "sha256": "72496a316e47b997f893500b8953dc01a10b86a2d4238e13c1260f50b47d792a",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/fr-CH",
+          "size": 86,
+          "sha256": "b449b0fd99d9cd93261fe1c6b816448b99b4a10420bee3f301e669568ad0de55",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/ht",
+          "size": 140,
+          "sha256": "389bdf3e984a2f93b7060baad82452dac65b83bf4482d3884525a176ae0e0524",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/it",
+          "size": 109,
+          "sha256": "0d9069eb9a96db1c55c131b2bb7d1f5255c68fbddc2199ffd3295b52519a3256",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/pap",
+          "size": 62,
+          "sha256": "41a5b5e91482a5498a66711c05873a634bbd418786b0ba037032df846344cfc1",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/pt",
+          "size": 95,
+          "sha256": "a44060072f790e41912c57b7d52f7b6438c4383e0dabdb052f6fdb7aacc23493",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/pt-BR",
+          "size": 109,
+          "sha256": "84dd4e34c970fadbe32211eadecfdfaab52432479c0911e43300da88a33398ba",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/roa/ro",
+          "size": 26,
+          "sha256": "b12af10ffc3f89cb87767ca701c6fea0def8a712de63426a9c3d0bf2432467f8",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/lang/sit/cmn",
+          "size": 686,
+          "sha256": "a130a38e3b622735c2401cb37f6719f46995e84a133729185cef9a543ec0b072",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/phondata",
+          "size": 550424,
+          "sha256": "4e0288957874029a8c3c9f41a8f517ad4bf18127046decbdd4b9d1d6807ce3a3",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/phonindex",
+          "size": 39074,
+          "sha256": "3ca7b8fa3b42624e4b0f152707e7a39245fce569aa99ea47c055d9e622fcf0c4",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/phontab",
+          "size": 55796,
+          "sha256": "886f3fa402cb0ba73d483aa8ad000af47a6b7cc06293c75a97913fba68a530f6",
+          "role": "espeak-data"
+        },
+        {
+          "path": "espeak-ng-data/pt_dict",
+          "size": 67817,
+          "sha256": "7e8398f15fa4a21db39a213381f28ec0d302b22663c644e865abb61a09c1b004",
+          "role": "espeak-data"
+        },
+        {
+          "path": "lexicon-us-en.txt",
+          "size": 5956885,
+          "sha256": "7daaab53a181be9885b853a8582bf1838186317e5dadacbcef9c426d6fa0da14",
+          "role": "lexicon"
+        },
+        {
+          "path": "lexicon-zh.txt",
+          "size": 2365182,
+          "sha256": "902bc2d20ac7c449c5ecbbbb23c89d12119c03ed5b8ed27f114f0260c9e35229",
+          "role": "lexicon"
+        },
+        {
+          "path": "number-zh.fst",
+          "size": 64482,
+          "sha256": "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd",
+          "role": "rule-fst"
+        },
+        {
+          "path": "phone-zh.fst",
+          "size": 88630,
+          "sha256": "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7",
+          "role": "rule-fst"
+        },
+        {
+          "path": "tokens.txt",
+          "size": 687,
+          "sha256": "6ebb6bb288f20f3ae8d004d3c2ca27697da27c037d75e81a60e2a6a663f95425",
+          "role": "tokens"
+        },
+        {
+          "path": "voices.bin",
+          "size": 28200960,
+          "sha256": "1c5a5b983d3d50d8586d437a51f3faa2da7919ce76a013c081e65671a3447c29",
+          "role": "voices"
+        }
+      ],
+      "languages": [
+        "pt-br",
+        "en-us",
+        "en-gb",
+        "es",
+        "fr",
+        "it",
+        "hi",
+        "zh"
+      ],
+      "min_ram_gb": 3,
+      "config": {
+        "model_type": "kokoro",
+        "sample_rate": 24000,
+        "num_speakers": 54,
+        "default_speaker_id": 42,
+        "data_dir": "espeak-ng-data",
+        "dict_dir": "dict",
+        "length_scale": 1.0,
+        "num_threads": 2,
+        "provider": "cpu",
+        "speakers": [
+          {
+            "id": 42,
+            "name": "Dora",
+            "language": "pt-br"
+          },
+          {
+            "id": 43,
+            "name": "Alex",
+            "language": "pt-br"
+          },
+          {
+            "id": 44,
+            "name": "Santa",
+            "language": "pt-br"
+          },
+          {
+            "id": 0,
+            "name": "Alloy",
+            "language": "en-us"
+          },
+          {
+            "id": 1,
+            "name": "Aoede",
+            "language": "en-us"
+          },
+          {
+            "id": 2,
+            "name": "Bella",
+            "language": "en-us"
+          },
+          {
+            "id": 3,
+            "name": "Heart",
+            "language": "en-us"
+          },
+          {
+            "id": 4,
+            "name": "Jessica",
+            "language": "en-us"
+          },
+          {
+            "id": 5,
+            "name": "Kore",
+            "language": "en-us"
+          },
+          {
+            "id": 6,
+            "name": "Nicole",
+            "language": "en-us"
+          },
+          {
+            "id": 7,
+            "name": "Nova",
+            "language": "en-us"
+          },
+          {
+            "id": 8,
+            "name": "River",
+            "language": "en-us"
+          },
+          {
+            "id": 9,
+            "name": "Sarah",
+            "language": "en-us"
+          },
+          {
+            "id": 10,
+            "name": "Sky",
+            "language": "en-us"
+          },
+          {
+            "id": 11,
+            "name": "Adam",
+            "language": "en-us"
+          },
+          {
+            "id": 12,
+            "name": "Echo",
+            "language": "en-us"
+          },
+          {
+            "id": 13,
+            "name": "Eric",
+            "language": "en-us"
+          },
+          {
+            "id": 14,
+            "name": "Fenrir",
+            "language": "en-us"
+          },
+          {
+            "id": 15,
+            "name": "Liam",
+            "language": "en-us"
+          },
+          {
+            "id": 16,
+            "name": "Michael",
+            "language": "en-us"
+          },
+          {
+            "id": 17,
+            "name": "Onyx",
+            "language": "en-us"
+          },
+          {
+            "id": 18,
+            "name": "Puck",
+            "language": "en-us"
+          },
+          {
+            "id": 19,
+            "name": "Santa",
+            "language": "en-us"
+          },
+          {
+            "id": 20,
+            "name": "Alice",
+            "language": "en-gb"
+          },
+          {
+            "id": 21,
+            "name": "Emma",
+            "language": "en-gb"
+          },
+          {
+            "id": 22,
+            "name": "Isabella",
+            "language": "en-gb"
+          },
+          {
+            "id": 23,
+            "name": "Lily",
+            "language": "en-gb"
+          },
+          {
+            "id": 24,
+            "name": "Daniel",
+            "language": "en-gb"
+          },
+          {
+            "id": 25,
+            "name": "Fable",
+            "language": "en-gb"
+          },
+          {
+            "id": 26,
+            "name": "George",
+            "language": "en-gb"
+          },
+          {
+            "id": 27,
+            "name": "Lewis",
+            "language": "en-gb"
+          },
+          {
+            "id": 28,
+            "name": "Dora",
+            "language": "es"
+          },
+          {
+            "id": 29,
+            "name": "Alex",
+            "language": "es"
+          },
+          {
+            "id": 53,
+            "name": "Santa",
+            "language": "es"
+          },
+          {
+            "id": 30,
+            "name": "Siwis",
+            "language": "fr"
+          },
+          {
+            "id": 31,
+            "name": "Alpha",
+            "language": "hi"
+          },
+          {
+            "id": 32,
+            "name": "Beta",
+            "language": "hi"
+          },
+          {
+            "id": 33,
+            "name": "Omega",
+            "language": "hi"
+          },
+          {
+            "id": 34,
+            "name": "Psi",
+            "language": "hi"
+          },
+          {
+            "id": 35,
+            "name": "Sara",
+            "language": "it"
+          },
+          {
+            "id": 36,
+            "name": "Nicola",
+            "language": "it"
+          },
+          {
+            "id": 45,
+            "name": "Xiaobei",
+            "language": "zh"
+          },
+          {
+            "id": 46,
+            "name": "Xiaoni",
+            "language": "zh"
+          },
+          {
+            "id": 47,
+            "name": "Xiaoxiao",
+            "language": "zh"
+          },
+          {
+            "id": 48,
+            "name": "Xiaoyi",
+            "language": "zh"
+          },
+          {
+            "id": 49,
+            "name": "Yunjian",
+            "language": "zh"
+          },
+          {
+            "id": 50,
+            "name": "Yunxi",
+            "language": "zh"
+          },
+          {
+            "id": 51,
+            "name": "Yunxia",
+            "language": "zh"
+          },
+          {
+            "id": 52,
+            "name": "Yunyang",
+            "language": "zh"
+          }
+        ]
+      },
+      "licence": {
+        "id": "apache-2.0; gpl-3.0",
+        "category": "conditional",
+        "requires_acceptance": true,
+        "credit": "Kokoro-82M by hexgrad; ONNX conversion by Fangjun Kuang (sherpa-onnx); eSpeak NG contributors; cppjieba dictionaries",
+        "rights_holder": "hexgrad; Fangjun Kuang; eSpeak NG contributors",
+        "terms": {
+          "license": "Apache-2.0 (Kokoro weights, bundled LICENSE); GPL-3.0 (eSpeak NG data)",
+          "notes": "The bundled LICENSE is Apache-2.0. Required eSpeak NG phonemizer data is GPL-3.0, so the complete selection is conditional. Voice styles derive from upstream Kokoro voices; voice rights are not asserted.",
+          "commercial_inference": "unknown",
+          "commercial_outputs": "unknown",
+          "redistribution": "unknown",
+          "voice_rights": "unknown",
+          "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+          "evidence_url": "https://huggingface.co/hexgrad/Kokoro-82M"
+        },
+        "terms_fingerprint": "ab67aa8c45ea1dc4682914e84bcf6792ab91c3ad217ceec1257108f493c3b0b7"
+      },
+      "total_bytes": 168332448
     }
   ]
 }

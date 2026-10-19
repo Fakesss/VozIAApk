@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "doc": "Phone models distributed as sherpa-onnx GitHub release archives. scripts/archive_models.py pins each archive's SHA-256 and every extracted file into models.json. Archives are fetched from GitHub only, never from Hugging Face.",
+  "models": [
+    {
+      "id": "piper-pt-br-faber",
+      "name": "Piper Faber (português do Brasil)",
+      "capability": "tts",
+      "runtime": "sherpa-onnx",
+      "archive": {"url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pt_BR-faber-medium.tar.bz2", "root": "vits-piper-pt_BR-faber-medium"},
+      "include": [
+        {"path": "pt_BR-faber-medium.onnx", "role": "model"},
+        {"path": "tokens.txt", "role": "tokens"},
+        {"path": "MODEL_CARD", "role": "notice"},
+        {"path": "espeak-ng-data/phondata", "role": "espeak-data"},
+        {"path": "espeak-ng-data/phonindex", "role": "espeak-data"},
+        {"path": "espeak-ng-data/phontab", "role": "espeak-data"},
+        {"path": "espeak-ng-data/intonations", "role": "espeak-data"},
+        {"path": "espeak-ng-data/pt_dict", "role": "espeak-data"},
+        {"path": "espeak-ng-data/lang/roa/pt", "role": "espeak-data"},
+        {"path": "espeak-ng-data/lang/roa/pt-BR", "role": "espeak-data"}
+      ],
+      "languages": ["pt-BR"],
+      "min_ram_gb": 2,
+      "config": {"model_type": "vits", "sample_rate": 22050, "num_speakers": 1, "default_speaker_id": 0, "data_dir": "espeak-ng-data", "length_scale": 1.0, "num_threads": 2, "provider": "cpu",
+        "speakers": [{"id": 0, "name": "Faber", "language": "pt-BR"}]},
+      "licence": {
+        "id": "cc0-1.0 (dataset); gpl-3.0 (eSpeak NG data); see notes",
+        "category": "conditional",
+        "requires_acceptance": true,
+        "credit": "Piper voice 'faber' by the Open Home Foundation / rhasspy contributors; ONNX packaging by Fangjun Kuang (sherpa-onnx); eSpeak NG contributors",
+        "rights_holder": "Open Home Foundation / rhasspy contributors; eSpeak NG contributors",
+        "terms": {
+          "license": "Dataset CC0 per the bundled MODEL_CARD; phonemizer data eSpeak NG (GPL-3.0)",
+          "notes": "The MODEL_CARD declares a CC0 dataset and states the voice was fine-tuned from the U.S. English 'lessac' voice, whose original dataset carries its own terms. Commercial use of the weights and of generated audio is therefore not asserted. Review the upstream terms before commercial use.",
+          "commercial_inference": "unknown",
+          "commercial_outputs": "unknown",
+          "redistribution": "unknown",
+          "voice_rights": "unknown",
+          "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+          "evidence_url": "https://huggingface.co/rhasspy/piper-voices/tree/main/pt/pt_BR/faber/medium"
+        }
+      }
+    },
+    {
+      "id": "supertonic-3-int8",
+      "name": "Supertonic 3 (31 idiomas)",
+      "capability": "tts",
+      "runtime": "sherpa-onnx",
+      "archive": {"url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2", "root": "sherpa-onnx-supertonic-3-tts-int8-2026-05-11"},
+      "include": [
+        {"path": "duration_predictor.int8.onnx", "role": "duration-predictor"},
+        {"path": "text_encoder.int8.onnx", "role": "text-encoder"},
+        {"path": "vector_estimator.int8.onnx", "role": "vector-estimator"},
+        {"path": "vocoder.int8.onnx", "role": "vocoder"},
+        {"path": "tts.json", "role": "tts-json"},
+        {"path": "unicode_indexer.bin", "role": "unicode-indexer"},
+        {"path": "voice.bin", "role": "voices"},
+        {"path": "LICENSE", "role": "notice"},
+        {"path": "README.md", "role": "notice"}
+      ],
+      "languages": ["pt", "en", "es", "fr", "it", "de", "nl", "pl", "ro", "ru", "uk", "tr", "ar", "hi", "id", "vi", "ja", "ko", "bg", "cs", "da", "el", "et", "fi", "hr", "hu", "lt", "lv", "sk", "sl", "sv"],
+      "min_ram_gb": 3,
+      "config": {"model_type": "supertonic", "sample_rate": 44100, "num_speakers": 10, "default_speaker_id": 0, "num_steps": 8, "num_threads": 2, "provider": "cpu",
+        "speakers": [
+          {"id": 0, "name": "F1"}, {"id": 1, "name": "F2"}, {"id": 2, "name": "F3"}, {"id": 3, "name": "F4"}, {"id": 4, "name": "F5"},
+          {"id": 5, "name": "M1"}, {"id": 6, "name": "M2"}, {"id": 7, "name": "M3"}, {"id": 8, "name": "M4"}, {"id": 9, "name": "M5"}
+        ]},
+      "licence": {
+        "id": "openrail-m (weights); mit (sample code)",
+        "category": "conditional",
+        "requires_acceptance": true,
+        "credit": "Supertonic 3 by Supertone Inc.; int8 ONNX conversion by Fangjun Kuang (sherpa-onnx)",
+        "rights_holder": "Supertone Inc.",
+        "terms": {
+          "license": "OpenRAIL-M for the model weights; MIT for the sample code",
+          "notes": "OpenRAIL-M permits use subject to use-based restrictions listed in the upstream LICENSE (for example, no use to impersonate people without consent or to generate unlawful content). The bundled README states the model licence; the full OpenRAIL-M text is published by Supertone.",
+          "commercial_inference": "conditional",
+          "commercial_outputs": "conditional",
+          "redistribution": "conditional",
+          "voice_rights": "unknown",
+          "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+          "evidence_url": "https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE"
+        }
+      }
+    },
+    {
+      "id": "kokoro-multi-v1-0-int8",
+      "name": "Kokoro v1.0 multilíngue",
+      "capability": "tts",
+      "runtime": "sherpa-onnx",
+      "archive": {"url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2", "root": "kokoro-int8-multi-lang-v1_0"},
+      "include": [
+        {"path": "model.int8.onnx", "role": "model"},
+        {"path": "voices.bin", "role": "voices"},
+        {"path": "tokens.txt", "role": "tokens"},
+        {"path": "lexicon-us-en.txt", "role": "lexicon"},
+        {"path": "lexicon-zh.txt", "role": "lexicon"},
+        {"path": "date-zh.fst", "role": "rule-fst"},
+        {"path": "number-zh.fst", "role": "rule-fst"},
+        {"path": "phone-zh.fst", "role": "rule-fst"},
+        {"path": "LICENSE", "role": "notice"},
+        {"glob": "dict/*.utf8", "role": "dict"},
+        {"glob": "dict/pos_dict/*.utf8", "role": "dict"},
+        {"path": "espeak-ng-data/phondata", "role": "espeak-data"},
+        {"path": "espeak-ng-data/phonindex", "role": "espeak-data"},
+        {"path": "espeak-ng-data/phontab", "role": "espeak-data"},
+        {"path": "espeak-ng-data/intonations", "role": "espeak-data"},
+        {"path": "espeak-ng-data/pt_dict", "role": "espeak-data"},
+        {"path": "espeak-ng-data/es_dict", "role": "espeak-data"},
+        {"path": "espeak-ng-data/fr_dict", "role": "espeak-data"},
+        {"path": "espeak-ng-data/it_dict", "role": "espeak-data"},
+        {"path": "espeak-ng-data/hi_dict", "role": "espeak-data"},
+        {"path": "espeak-ng-data/en_dict", "role": "espeak-data"},
+        {"path": "espeak-ng-data/cmn_dict", "role": "espeak-data"},
+        {"glob": "espeak-ng-data/lang/roa/*", "role": "espeak-data"},
+        {"glob": "espeak-ng-data/lang/gmw/en*", "role": "espeak-data"},
+        {"glob": "espeak-ng-data/lang/inc/hi", "role": "espeak-data"},
+        {"glob": "espeak-ng-data/lang/sit/cmn", "role": "espeak-data"}
+      ],
+      "languages": ["pt-br", "en-us", "en-gb", "es", "fr", "it", "hi", "zh"],
+      "min_ram_gb": 3,
+      "config": {"model_type": "kokoro", "sample_rate": 24000, "num_speakers": 54, "default_speaker_id": 42, "data_dir": "espeak-ng-data", "dict_dir": "dict", "length_scale": 1.0, "num_threads": 2, "provider": "cpu",
+        "speakers": [
+          {"id": 42, "name": "Dora", "language": "pt-br"}, {"id": 43, "name": "Alex", "language": "pt-br"}, {"id": 44, "name": "Santa", "language": "pt-br"},
+          {"id": 0, "name": "Alloy", "language": "en-us"}, {"id": 1, "name": "Aoede", "language": "en-us"}, {"id": 2, "name": "Bella", "language": "en-us"}, {"id": 3, "name": "Heart", "language": "en-us"},
+          {"id": 4, "name": "Jessica", "language": "en-us"}, {"id": 5, "name": "Kore", "language": "en-us"}, {"id": 6, "name": "Nicole", "language": "en-us"}, {"id": 7, "name": "Nova", "language": "en-us"},
+          {"id": 8, "name": "River", "language": "en-us"}, {"id": 9, "name": "Sarah", "language": "en-us"}, {"id": 10, "name": "Sky", "language": "en-us"}, {"id": 11, "name": "Adam", "language": "en-us"},
+          {"id": 12, "name": "Echo", "language": "en-us"}, {"id": 13, "name": "Eric", "language": "en-us"}, {"id": 14, "name": "Fenrir", "language": "en-us"}, {"id": 15, "name": "Liam", "language": "en-us"},
+          {"id": 16, "name": "Michael", "language": "en-us"}, {"id": 17, "name": "Onyx", "language": "en-us"}, {"id": 18, "name": "Puck", "language": "en-us"}, {"id": 19, "name": "Santa", "language": "en-us"},
+          {"id": 20, "name": "Alice", "language": "en-gb"}, {"id": 21, "name": "Emma", "language": "en-gb"}, {"id": 22, "name": "Isabella", "language": "en-gb"}, {"id": 23, "name": "Lily", "language": "en-gb"},
+          {"id": 24, "name": "Daniel", "language": "en-gb"}, {"id": 25, "name": "Fable", "language": "en-gb"}, {"id": 26, "name": "George", "language": "en-gb"}, {"id": 27, "name": "Lewis", "language": "en-gb"},
+          {"id": 28, "name": "Dora", "language": "es"}, {"id": 29, "name": "Alex", "language": "es"}, {"id": 53, "name": "Santa", "language": "es"},
+          {"id": 30, "name": "Siwis", "language": "fr"},
+          {"id": 31, "name": "Alpha", "language": "hi"}, {"id": 32, "name": "Beta", "language": "hi"}, {"id": 33, "name": "Omega", "language": "hi"}, {"id": 34, "name": "Psi", "language": "hi"},
+          {"id": 35, "name": "Sara", "language": "it"}, {"id": 36, "name": "Nicola", "language": "it"},
+          {"id": 45, "name": "Xiaobei", "language": "zh"}, {"id": 46, "name": "Xiaoni", "language": "zh"}, {"id": 47, "name": "Xiaoxiao", "language": "zh"}, {"id": 48, "name": "Xiaoyi", "language": "zh"},
+          {"id": 49, "name": "Yunjian", "language": "zh"}, {"id": 50, "name": "Yunxi", "language": "zh"}, {"id": 51, "name": "Yunxia", "language": "zh"}, {"id": 52, "name": "Yunyang", "language": "zh"}
+        ]},
+      "licence": {
+        "id": "apache-2.0; gpl-3.0",
+        "category": "conditional",
+        "requires_acceptance": true,
+        "credit": "Kokoro-82M by hexgrad; ONNX conversion by Fangjun Kuang (sherpa-onnx); eSpeak NG contributors; cppjieba dictionaries",
+        "rights_holder": "hexgrad; Fangjun Kuang; eSpeak NG contributors",
+        "terms": {
+          "license": "Apache-2.0 (Kokoro weights, bundled LICENSE); GPL-3.0 (eSpeak NG data)",
+          "notes": "The bundled LICENSE is Apache-2.0. Required eSpeak NG phonemizer data is GPL-3.0, so the complete selection is conditional. Voice styles derive from upstream Kokoro voices; voice rights are not asserted.",
+          "commercial_inference": "unknown",
+          "commercial_outputs": "unknown",
+          "redistribution": "unknown",
+          "voice_rights": "unknown",
+          "source_url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+          "evidence_url": "https://huggingface.co/hexgrad/Kokoro-82M"
+        }
+      }
+    }
+  ]
+}

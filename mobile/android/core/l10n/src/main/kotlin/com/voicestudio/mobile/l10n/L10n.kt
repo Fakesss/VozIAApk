@@ -63,7 +63,7 @@ class L10n(private val catalogs: Map<String, JsonObject>, val locale: String) {
             return loaders.getOrPut(assets) {
                 CatalogLoader(
                     read = { name -> assets.open(name).bufferedReader().use { Json.parseToJsonElement(it.readText()).jsonObject } },
-                    additions = assets.list("").orEmpty().filter { it.startsWith("strings") && it.endsWith(".en.json") }
+                    additions = assets.list("").orEmpty().filter { it.startsWith("strings.") && it.endsWith(".json") }
                         .sortedWith(compareBy<String> { when(it) { "strings.mobile.en.json" -> 0; "strings.android-additions.en.json" -> 2; else -> 1 } }.thenBy { it })
                 )
             }.load(locale)
@@ -79,7 +79,8 @@ class L10n(private val catalogs: Map<String, JsonObject>, val locale: String) {
                     }.associateWith { language ->
                         parsed.getOrPut(language) {
                             var catalog = read("locales/$language.json")
-                            if(language == "en") for(name in additions) catalog = merge(catalog, read(name))
+                            // strings.<set>.<language>.json overlays that language's catalogue.
+                            for(name in additions) if(name.endsWith(".$language.json")) catalog = merge(catalog, read(name))
                             catalog
                         }
                     }

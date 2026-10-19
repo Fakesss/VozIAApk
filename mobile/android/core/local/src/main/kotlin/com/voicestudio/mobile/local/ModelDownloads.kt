@@ -13,12 +13,16 @@ import java.io.RandomAccessFile
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
+/** ENOSPC surfaces as a plain IOException; report it as missing storage, not a network fault. */
+fun isNoSpace(error: Throwable): Boolean = generateSequence(error) {it.cause}.any {
+    it is android.system.ErrnoException && it.errno==android.system.OsConstants.ENOSPC || it.message?.contains("ENOSPC")==true || it.message?.contains("No space left",ignoreCase=true)==true
+}
 internal fun sha256(file: File, check: ()->Unit = {}): String = file.inputStream().use { input ->
     val digest=MessageDigest.getInstance("SHA-256");val bytes=ByteArray(262144)
     while(true) {check();val n=input.read(bytes);if(n<0) break;digest.update(bytes,0,n)}
     digest.digest().joinToString("") {"%02x".format(it)}
 }
-data class DownloadProgress(val received: Long = 0, val total: Long = 0, val running: Boolean = false, val error: String? = null)
+data class DownloadProgress(val received: Long = 0, val total: Long = 0, val running: Boolean = false, val error: String? = null, val extracting: Boolean = false)
 /** Dedicated public-download client never carries paired-host PINs or sessions. */
 class ModelDownloads internal constructor(
     private val root: File, val licence: LicenceGate, private val ramBytes: Long,
@@ -49,7 +53,7 @@ class ModelDownloads internal constructor(
     val progress=mutable.asStateFlow()
     private fun dir(model: PhoneModel)=File(root,model.id)
     private fun identity(model: PhoneModel)=model.revision+model.files.joinToString {it.path+it.sha256+it.size}
-    fun installed(model: PhoneModel): Boolean = runCatching {
+    fun installed(model: PhoneModel): Boolean = model.system || runCatching {
         val directory=dir(model)
         File(directory,".verified").readText()==identity(model) && model.files.all {File(directory,it.path).length()==it.size}
     }.getOrDefault(false)
@@ -64,15 +68,16 @@ class ModelDownloads internal constructor(
             val directory=dir(model).apply {mkdirs()}
             val catalogue=modelPin(model).identity
             val completedFiles=model.files.filter {verifiedFile(File(directory,it.path),it,catalogue) {job.ensureActive()}}.toSet()
-            val needed=model.files.filterNot {it in completedFiles}.sumOf { f ->
+            val needed=if(model.archive!=null) archiveBytesNeeded(model,directory,completedFiles) else model.files.filterNot {it in completedFiles}.sumOf { f ->
                 val partial=File(directory,f.path+".part").length().takeIf {it<=f.size} ?: 0L
                 f.size-partial
             }
             if(freeBytes()<needed+16*1024*1024) throw ClientFailure("mobile.local.storage_required")
-            mutable.update {it+(model.id to DownloadProgress(total=model.totalBytes,running=true))}
+            mutable.update {it+(model.id to DownloadProgress(total=model.archive?.size ?: model.totalBytes,running=true))}
             try {
+                if(model.archive!=null) downloadArchive(model,allowMobile,directory,catalogue,completedFiles)
                 var completed=0L
-                model.files.forEach { f ->
+                if(model.archive==null) model.files.forEach { f ->
                     currentCoroutineContext().ensureActive();licence.requireAccepted(model)
                     val target=File(directory,f.path).apply {parentFile!!.mkdirs()}
                     if(f in completedFiles) {completed+=f.size;return@forEach}
@@ -86,7 +91,7 @@ class ModelDownloads internal constructor(
                             last=null;break
                         } catch(e:IOException) {last=e;currentCoroutineContext().ensureActive()}
                     }
-                    if(last!=null) throw ClientFailure("mobile.local.download_failed")
+                    if(last!=null) throw ClientFailure(if(isNoSpace(last)) "mobile.local.storage_required" else "mobile.local.download_failed")
                     currentCoroutineContext().ensureActive()
                     if(part.length()!=f.size||digest(part) {job.ensureActive()}!=f.sha256) {part.delete();throw ClientFailure("mobile.local.checksum_failed")}
                     licence.requireAccepted(model)
@@ -97,22 +102,94 @@ class ModelDownloads internal constructor(
                 licence.requireAccepted(model)
                 val marker=File(directory,".verified.tmp");marker.writeText(identity(model))
                 if(!marker.renameTo(File(directory,".verified"))) throw ClientFailure("mobile.local.storage_required")
-                mutable.update {it+(model.id to DownloadProgress(model.totalBytes,model.totalBytes))}
+                mutable.update {it+(model.id to DownloadProgress(model.archive?.size ?: model.totalBytes,model.archive?.size ?: model.totalBytes))}
             } catch(e:CancellationException) {mutable.update {it-model.id};throw e}
             catch(e:Exception) {
-                val failure=e as? ClientFailure ?: ClientFailure("mobile.local.download_failed")
+                val failure=e as? ClientFailure ?: ClientFailure(if(isNoSpace(e)) "mobile.local.storage_required" else "mobile.local.download_failed")
                 mutable.update {it+(model.id to DownloadProgress(total=model.totalBytes,error=failure.key))};throw failure
             }
         }
     }
     private fun allowed(url: HttpUrl): Boolean = allowTestHttp || (url.scheme=="https" && url.username.isEmpty() && url.password.isEmpty() &&
         (url.host in setOf("huggingface.co","hf-mirror.com","hf.co") || url.host.endsWith(".huggingface.co") || url.host.endsWith(".hf.co")))
-    private suspend fun transfer(endpoint: String, model: PhoneModel, file: ModelFile, partial: File, allowMobile: Boolean, report: (Long)->Unit) {
-        if(partial.length()==file.size) return
-        var url=endpoint.toHttpUrl().newBuilder().addPathSegments(model.repo).addPathSegment("resolve").addPathSegment(model.revision).addPathSegments(file.path).build()
+    /** GitHub release downloads redirect once to its asset CDN; nothing else is followed. */
+    private fun archiveAllowed(url: HttpUrl): Boolean = allowTestHttp || (url.scheme=="https" && url.username.isEmpty() && url.password.isEmpty() &&
+        ((url.host=="github.com" && url.encodedPath.startsWith("/k2-fsa/sherpa-onnx/releases/download/")) ||
+            url.host in setOf("objects.githubusercontent.com","release-assets.githubusercontent.com")))
+    private fun archivePart(directory: File)=File(directory,".archive.part")
+    private fun archiveBytesNeeded(model: PhoneModel, directory: File, completed: Set<ModelFile>): Long {
+        val missing=model.files.filterNot {it in completed}
+        if(missing.isEmpty()) return 0
+        val archive=requireNotNull(model.archive)
+        val partial=archivePart(directory).length().takeIf {it<=archive.size} ?: 0L
+        // The archive and every extracted file coexist until extraction finishes.
+        return archive.size-partial+missing.sumOf {it.size}
+    }
+    /** Resumable archive transfer, archive SHA-256, then member-by-member verified extraction. */
+    private suspend fun downloadArchive(model: PhoneModel, allowMobile: Boolean, directory: File, catalogue: String, completed: Set<ModelFile>) {
+        val archive=requireNotNull(model.archive)
+        val missing=model.files.filterNot {it in completed}
+        if(missing.isEmpty()) return
+        val job=currentCoroutineContext().job
+        val part=archivePart(directory)
+        if(part.length()>archive.size) part.delete()
+        try {
+            transferUrl(archive.url.toHttpUrl(),archive.size,model,part,allowMobile,::archiveAllowed) {received ->
+                mutable.update {it+(model.id to DownloadProgress(received,archive.size,true))}
+            }
+        } catch(e:ClientFailure) {throw e}
+        catch(e:IOException) {currentCoroutineContext().ensureActive();throw ClientFailure(if(isNoSpace(e)) "mobile.local.storage_required" else "mobile.local.download_failed")}
+        currentCoroutineContext().ensureActive()
+        if(part.length()!=archive.size||digest(part) {job.ensureActive()}!=archive.sha256) {part.delete();throw ClientFailure("mobile.local.checksum_failed")}
+        licence.requireAccepted(model)
+        mutable.update {it+(model.id to DownloadProgress(archive.size,archive.size,true,extracting=true))}
+        val wanted=missing.associateBy {it.path}
+        val root=directory.canonicalFile
+        val extracted=mutableSetOf<String>()
+        org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
+            org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream(java.io.BufferedInputStream(part.inputStream(),1 shl 16))).use {tar ->
+            while(true) {
+                currentCoroutineContext().ensureActive()
+                val entry=tar.nextEntry ?: break
+                if(!entry.isFile) continue
+                val relative=entry.name.removePrefix("./").takeIf {it.startsWith(archive.root+"/")}?.removePrefix(archive.root+"/") ?: continue
+                val expected=wanted[relative] ?: continue
+                val target=File(directory,expected.path).canonicalFile
+                if(!target.path.startsWith(root.path+File.separator)) throw ClientFailure("mobile.local.model_incompatible")
+                target.parentFile!!.mkdirs()
+                val pending=File(target.path+".part")
+                val sha=MessageDigest.getInstance("SHA-256")
+                var count=0L
+                java.io.FileOutputStream(pending).use {out ->
+                    val bytes=ByteArray(65536)
+                    while(true) {
+                        currentCoroutineContext().ensureActive()
+                        val n=tar.read(bytes);if(n<0) break
+                        count+=n
+                        if(count>expected.size) {pending.delete();throw ClientFailure("mobile.local.checksum_failed")}
+                        sha.update(bytes,0,n);out.write(bytes,0,n)
+                    }
+                    out.fd.sync()
+                }
+                if(count!=expected.size||sha.digest().joinToString("") {"%02x".format(it)}!=expected.sha256) {pending.delete();throw ClientFailure("mobile.local.checksum_failed")}
+                verified.remove(target);target.delete()
+                if(!pending.renameTo(target)) throw ClientFailure("mobile.local.storage_required")
+                verified[target]=stamp(target,catalogue)
+                extracted+=expected.path
+            }
+        }
+        if(!extracted.containsAll(wanted.keys)) throw ClientFailure("mobile.local.checksum_failed")
+        part.delete()
+    }
+    private suspend fun transfer(endpoint: String, model: PhoneModel, file: ModelFile, partial: File, allowMobile: Boolean, report: (Long)->Unit) =
+        transferUrl(endpoint.toHttpUrl().newBuilder().addPathSegments(model.repo).addPathSegment("resolve").addPathSegment(model.revision).addPathSegments(file.path).build(),
+            file.size,model,partial,allowMobile,::allowed,report)
+    private suspend fun transferUrl(initial: HttpUrl, expectedSize: Long, model: PhoneModel, partial: File, allowMobile: Boolean, permitted: (HttpUrl)->Boolean, report: (Long)->Unit) {
+        if(partial.length()==expectedSize) return
+        var url=initial
         repeat(10) {
             networkAllowed(allowMobile);licence.requireAccepted(model);currentCoroutineContext().ensureActive()
-            if(!allowed(url)) throw ClientFailure("mobile.local.download_failed")
+            if(!permitted(url)) throw ClientFailure("mobile.local.download_failed")
             val offset=partial.length()
             val request=Request.Builder().url(url).header("Accept-Encoding","identity").apply {if(offset>0) header("Range","bytes=$offset-")}.build()
             val call=client.newCall(request)
@@ -126,7 +203,7 @@ class ModelDownloads internal constructor(
                             if(response.code !in listOf(200,206)) throw IOException("Download HTTP ${response.code}")
                             val start=if(response.code==206) offset else 0L
                             if(response.code==206 && response.header("Content-Range")?.startsWith("bytes $offset-")!=true) throw IOException("Invalid range")
-                            if(response.code==206 && response.header("Content-Range")?.substringAfter('/')!=file.size.toString()) throw IOException("Invalid total")
+                            if(response.code==206 && response.header("Content-Range")?.substringAfter('/')!=expectedSize.toString()) throw IOException("Invalid total")
                             val body=response.body ?: throw IOException()
                             RandomAccessFile(partial,"rw").use { output ->
                                 if(start==0L) output.setLength(0)
@@ -136,19 +213,19 @@ class ModelDownloads internal constructor(
                                     while(true) {
                                         currentCoroutineContext().ensureActive();networkAllowed(allowMobile);licence.requireAccepted(model)
                                         val n=input.read(bytes);if(n<0) break
-                                        if(count+n>file.size) {partial.delete();throw ClientFailure("mobile.local.checksum_failed")}
+                                        if(count+n>expectedSize) {partial.delete();throw ClientFailure("mobile.local.checksum_failed")}
                                         output.write(bytes,0,n);count+=n;report(count)
                                     }
                                 }
                                 output.fd.sync()
-                                if(count!=file.size) throw IOException("Incomplete model file")
+                                if(count!=expectedSize) throw IOException("Incomplete model file")
                             }
                             return@coroutineScope
                         }
                     }
                 } finally {cancellation.cancelAndJoin()}
             }
-            if(partial.length()==file.size) return
+            if(partial.length()==expectedSize) return
         }
         throw IOException("Too many download redirects")
     }
@@ -159,6 +236,7 @@ class ModelDownloads internal constructor(
     }}
     /** Deletion and inference share a lease. Rehash only changed files or after a failed native use. */
     suspend fun <T> withModel(model: PhoneModel, use: suspend (File)->T): T = withContext(Dispatchers.IO) {lock(model).withLock {
+        if(model.system) return@withLock use(dir(model))
         fit(model);licence.requireAccepted(model)
         if(!installed(model)) throw ClientFailure("mobile.local.model_required")
         val job=currentCoroutineContext().job
